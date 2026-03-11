@@ -11,6 +11,10 @@ import type { AllocationResult, EngineInput, EngineOutput } from "./engineTypes"
 
 export function resolveRecipe(input: EngineInput): EngineOutput {
 
+    if (input.totalRiceKg <= 0) {
+        throw new Error(`resolveRecipe: totalRiceKg must be > 0 (got ${input.totalRiceKg})`);
+    }
+
     const totalRiceKg = input.totalRiceKg;
     let totalKojiKg = 0.0;
     let totalKakeKg = 0.0;

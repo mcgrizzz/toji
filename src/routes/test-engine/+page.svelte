@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { recipeInput } from '$lib/engine/testInput';
 	import { resolveRecipe } from '$lib/engine/resolveRecipe';
-	import type { EngineInput, EngineOutput } from '$lib/engine/types';
+	import type { EngineInput, EngineOutput } from '$lib/engine/engineTypes';
 
 	let draft = $state(JSON.stringify(recipeInput, null, 2));
 
@@ -61,7 +61,7 @@
           bind:value={draft}
           spellcheck="false"
           class="h-[70vh] w-full resize-none rounded-md border bg-background p-3 font-mono text-xs leading-5 outline-none focus:ring-2 focus:ring-ring"
-        />
+        ></textarea>
       </div>
     </section>
 

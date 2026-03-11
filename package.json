@@ -12,10 +12,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"db:push": "drizzle-kit push",
-		"db:generate": "drizzle-kit generate",
-		"db:migrate": "drizzle-kit migrate",
-		"db:studio": "drizzle-kit studio"
+"stdb:generate": "spacetime generate --lang typescript --out-dir ./src/lib/spacetimedb/module_bindings --module-path ./server",
+		"stdb:publish": "spacetime publish toji --server local --module-path ./server"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
@@ -28,13 +26,10 @@
 		"@tailwindcss/forms": "^0.5.10",
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.1.17",
-		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^22",
 		"bits-ui": "^2.15.4",
 		"clsx": "^2.1.1",
-		"drizzle-kit": "^0.31.8",
-		"drizzle-orm": "^0.45.0",
-		"eslint": "^9.39.1",
+"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.13.1",
 		"globals": "^16.5.0",
@@ -51,7 +46,5 @@
 		"typescript-eslint": "^8.48.1",
 		"vite": "^7.2.6"
 	},
-	"dependencies": {
-		"better-sqlite3": "^12.5.0"
-	}
+	"dependencies": {}
 }

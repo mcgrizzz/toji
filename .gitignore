@@ -1,10 +1,10 @@
 node_modules
 
 # Output
-.output
-.vercel
-.netlify
-.wrangler
+.output/
+.vercel/
+.netlify/
+.wrangler/
 /.svelte-kit
 /build
 
@@ -24,3 +24,8 @@ vite.config.ts.timestamp-*
 
 # SQLite
 *.db
+
+# spacetimedb
+*/dist/*
+
+*/lib/spacetimedb/
