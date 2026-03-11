@@ -1,0 +1,117 @@
+
+Recipe Spec Example:
+
+Name: Sakura Ginjo
+Description: Starter Ginjo
+
+Koji Type: Ueda Standard:
+
+- Ueda Standard
+  - Koji g/kg: .08
+  - Carrier Ratio: 5
+  - Carrer: Toasted Rice Flour
+
+Moto Type: Sokujo Standard
+-	Sokujo Standard:
+	- Total Rice Fract: 7%
+	- Koji Fraction: 70:30 kake:koji
+	- waterLPerKg: 1.07
+	- yeast pitch rate: 3 million/ml of moromi
+	- required acid addition: .03ml/L @ lactic 88%, this will be a different ml/L when we select different acids to get the same ph result.
+	
+Moromi: Sandan Standard
+	- Sandan Standard
+		- Soe [15% total rice, 72:28 kake:koji, .92 L/kg]
+		- Naka [30% total rice, 79:21 kake:koji, 1.2 L/kg]
+		- Tome [ total rice, 79:21 kake:koji, 1.2 L/kg]
+
+Amendments: Sakura Infuse
+	- .05% total rice weight
+	- Added during odori in sandan
+
+Water: [Moto]/Total
+Water Profile: Ginjo 1:
+	- Ginjo 1
+		Calcium: 10 ppm
+		Magnesium: 3 ppm
+	
+
+Recommended Rice Polish: 60%
+Recommended Rice: Yamadanishiki
+
+-----
+Goes into plan: 
+Recipe Plan Example:
+
+Total Genshu Volume: [6.7L] / Target Rice Usage: [----] * not selected because we're using genshu volume target
+Use Premade koji: [No]/Yes
+Selected Rice: Gohyakumangoku @ 65% [lot A] - for koji
+Selected Rice: Gohyakumangoku @ 60% [lot B] - for moto + moromi
+Selected Koji Strain: [Akita Konno A-1]
+Selected Yeast: [WL707][Liquid Pouches]
+Selected Water: RO Base, no amendments
+
+Moto: Selected Acid: Lactic 88%
+
+---
+Output Recipes and Workflows and Schedules etc
+
+Materials: 
+
+Koji: 
+- 1.49kg x Gohyakumangoku @ 65%
+- 1.2g x [Akita Konno A-1]
+
+Moto: 
+- Total Rice: .3850kg
+	- 0.2580kg x Gohyakumangoku @ 60%
+	- 0.1271kg x Koji
+- 0.4235L x H20
+- 1 x WL707 Yeast Pouch
+- .2ml 88% lactic acid
+
+Moromi:
+- 	    Kakemai | Koji | Water
+- Soe | 0.853   | 0.240| 0.810036975
+- Naka| 1.705   | 0.361| 2.131036875
+- Tome| 2.558   | 0.481| 3.708375000
+- Sakura Petals x 2.7g
+
+Summary: 
+Total Rice: 
+- 1.49kg x Gohyakumangoku @ 65%
+- 5.374kg x Gohyakumangoku @ 60%
+
+Workflows:
+
+Koji Workflow:
+
+## Wash, Soak, Drain - [Open Soak Calculator]
+1. Wash Rice ambient temp  [Checked] 
+2. Soak rice for 4 hours [Checked] | 28-32% Moisture goal | Rice weight at end of step [1.922kg] = 29% moisture ✓
+3. Drain for 2 hours [Started, 1 hour left] | 
+4. Steam for 1 hour | 
+5. Dry down 1-5 hours in 40C | Stop when 28-31%, 29% is a good place | [RICE WEIGHT INPUT]
+6. Tane-tsuke, transfer to tubs and lid, incubate at 32C | Rice must be below 40C
+7. Momi-age | 18 hours | 32C chamber | 28-29% at end of step | 10-20 surface haze at end of step*  | [RICE WEIGHT INPUT]
+8. Mori | ~6 hours | Stable moisture | Koji should be at 32.5-35C at the beginning of the step | mix + breakup any clumps, open lid slightly | [RICE WEIGHT INPUT]
+9. Naka | ~6 hours | Stable moisture | Chamber set to 33-34C | 34-35C koji temp at beginning of the step | 30-40% haze before moving on | [RICE WEIGHT INPUT]
+10. Shimai | 35-36C chamber temp | 38-39C koji temp at start of step, 38.5C is perfect for shimai | [RICE WEIGHT INPUT] 
+11. Peak | Mark peak temperature 40-43C | [RICE WEIGHT INPUT] 
+12. De-koji | 10-18hours post peak | 13-17% moisture | 40-43 koji temp | [RICE WEIGHT INPUT] 
+	Put the koji into a cool dry spot or fridge, don't seal right away. 
+	
+Moto: 
+
+1. Take yeast from fridge / Hydrate dry yeast [This will depend on yeast type selected etc]
+2. Add [127g koji], [84ml water], and yeast. Leave at room temp | pH goal 3.5 | temperature goal 15-18C
+3. 6-8 hours later
+Wash Drain Soak [258g rice]
+...
+...
+4. Add rice
+Day 5. Stir Twice | Goal moto temp 15-18 | [RECORDED TEMP]
+Day 6. Stir Twice | Goal moto temp 12-15C | [RECORDED TEMP]
+... etc
+Day 10 | Moto Ready
+

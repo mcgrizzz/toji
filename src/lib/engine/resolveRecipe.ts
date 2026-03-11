@@ -1,4 +1,4 @@
-import type { AllocationResult, EngineInput, EngineOutput } from "./types";
+import type { AllocationResult, EngineInput, EngineOutput } from "./engineTypes";
 
 //Engine is agnostic to conventions/traditions. It's a simple machine, we will enforce rules/scaling/conventions above the the engine, not within it. 
 //notice, there is no concept of moto, moromi, etc in here. 
@@ -8,7 +8,6 @@ import type { AllocationResult, EngineInput, EngineOutput } from "./types";
  * 2. global koji % or water rates need to be enforced if enabled
  * 3. Recipe scaling
  */
-
 
 export function resolveRecipe(input: EngineInput): EngineOutput {
 

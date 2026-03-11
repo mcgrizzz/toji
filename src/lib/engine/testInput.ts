@@ -1,4 +1,4 @@
-import type { EngineInput } from "./types";
+import type { EngineInput } from "./engineTypes";
 
 //This a converted recipe from NRIB from the Acidhouse spreadsheet 
 export const recipeInput: EngineInput = {
