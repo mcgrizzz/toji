@@ -11,13 +11,23 @@ export type YeastProduct = {
 	viability: YeastViabilityModel;
 };
 
-/** How cell count decays over time */
-export type YeastViabilityModel = {
-	/** Daily viability loss as a fraction (e.g. 0.005 = 0.5%/day) */
+/** Linear decay: viability = initialViabilityFrac - dailyLossFrac * ageDays */
+export type LinearViabilityModel = {
+	kind: 'linear';
+	initialViabilityFrac: number;
 	dailyLossFrac: number;
-	/** Max age in days before viability is considered zero */
 	maxAgeDays: number;
 };
+
+/** Exponential decay: viability = initialViabilityFrac * exp(decayRatePerDay * ageDays) */
+export type ExponentialViabilityModel = {
+	kind: 'exponential';
+	initialViabilityFrac: number;
+	decayRatePerDay: number;
+	maxAgeDays: number;
+};
+
+export type YeastViabilityModel = LinearViabilityModel | ExponentialViabilityModel;
 
 /** Specific yeast packages selected for a batch */
 export type YeastSelection = {
