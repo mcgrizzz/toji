@@ -1,4 +1,4 @@
-import type { IonTarget, MineralSalt } from './recipeTypes';
+import type { IonTarget, MineralSalt } from './catalogTypes';
 
 /** Total hardness expressed as CaCO3 equivalents (ppm) */
 export function calcHardnessAsCaCO3(caPpm: number, mgPpm: number): number {

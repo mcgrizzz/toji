@@ -5,9 +5,9 @@ import type {
 	MoromiPreset,
 	WaterProfile,
 	MineralSalt,
-	AcidType,
-	StoredRecipeTemplate
-} from './recipeTypes';
+	AcidType
+} from './catalogTypes';
+import type { StoredRecipeTemplate } from './templateTypes';
 
 // ── Built-in preset data (mirrors seed.ts) ─────────────────────────────────
 

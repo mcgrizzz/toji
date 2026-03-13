@@ -94,28 +94,3 @@ export type AcidType = {
 	/** Relative acidity compared to the reference acid (lactic 88% = 1.0) */
 	relativeAcidity: number;
 };
-
-// ── Amendment / StoredRecipeTemplate ─────────────────────────────────────────
-
-export type AmendmentPlacement =
-	| { where: 'moto' }
-	| { where: 'moromi'; stageOrdinal: number };
-
-export type AmendmentSpec = {
-	kind: string;
-	/** Fraction of total batch rice mass */
-	fracOfTotalRice: number;
-	placement: AmendmentPlacement;
-};
-
-export type StoredRecipeTemplate = {
-	id: string;
-	name: string;
-	kojiPresetRef: string;
-	motoPresetRef: string;
-	moromiPresetRef: string;
-	waterProfileRef: string;
-	recommendedRiceVariety?: string;
-	recommendedPolishPct?: number;
-	amendments: AmendmentSpec[];
-};

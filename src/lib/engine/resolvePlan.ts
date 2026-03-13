@@ -23,7 +23,7 @@ import type {
 	WaterBill
 } from './planTypes';
 import { resolveRecipe } from './resolveRecipe';
-import type { MoromiAdditionSpec } from './recipeTypes';
+import type { MoromiAdditionSpec } from './catalogTypes';
 
 // ── Target resolution ────────────────────────────────────────────────────────
 
