@@ -6,6 +6,7 @@ import { ginjo1 } from '$lib/data/catalog/waterProfiles';
 import { availableSalts } from '$lib/data/catalog/salts';
 import { uedaKojiSchedule } from '$lib/data/schedules/uedaKojiSchedule';
 import { sokujoMotoSchedule } from '$lib/data/schedules/sokujoMotoSchedule';
+import { lacticAcid88 } from '$lib/data/catalog/acids';
 import type { StoredRecipeTemplate } from '$lib/engine/models/templateTypes';
 
 const template: StoredRecipeTemplate = {
@@ -41,6 +42,7 @@ export const sakuraGinjoBundle: RecipeBundle = {
 		availableSalts,
 		spec: template
 	},
+	defaultAcid: lacticAcid88,
 	schedules: {
 		koji: uedaKojiSchedule,
 		moto: sokujoMotoSchedule

@@ -155,6 +155,7 @@ export function resolvePlan(plan: RecipePlan, presets: LoadedPresets): Materials
 		kojiKg: motoResult.kojiKg,
 		waterL: motoResult.waterL,
 		acidDoseMl,
+		acid: plan.moto.acid,
 		yeast: plan.moto.yeast,
 		riceLot: plan.moto.riceLot
 	};

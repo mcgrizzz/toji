@@ -5,6 +5,7 @@ import type { ScheduleTemplate } from '$lib/engine/models/scheduleTypes';
 import type { ResolvedSchedule } from '$lib/engine/resolvers/resolveSchedules';
 import type { PitchingResult } from '$lib/engine/resolvers/resolvePitching';
 import type { YeastSelection } from '$lib/engine/models/yeastTypes';
+import type { AcidType } from '$lib/engine/models/catalogTypes';
 
 // ── Recipe bundle ───────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ export type RecipeBundle = {
 	template: StoredRecipeTemplate;
 	presets: LoadedPresets;
 	schedules: Partial<Record<WorkflowKind, ScheduleTemplate>>;
+	defaultAcid: AcidType;
 	defaults: {
 		targetKind: 'genshu_volume_L' | 'total_rice_kg';
 		targetValue: number;

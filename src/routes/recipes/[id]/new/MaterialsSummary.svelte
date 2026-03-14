@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { MaterialsBill } from '$lib/engine/models/planTypes';
 	import type { KojiPreset } from '$lib/engine/models/catalogTypes';
-	import { lacticAcid88 } from '$lib/data/catalog/acids';
 
 	type Props = {
 		bill: MaterialsBill;
@@ -53,7 +52,7 @@
 		</p>
 		<p>Koji: {r(bill.moto.kojiKg)} kg</p>
 		<p>Water: {r(bill.moto.waterL)} L</p>
-		<p>Acid: {r(bill.moto.acidDoseMl, 2)} mL ({lacticAcid88.name})</p>
+		<p>Acid: {r(bill.moto.acidDoseMl, 2)} mL ({bill.moto.acid.name})</p>
 		<p>Yeast: {bill.moto.yeast.name} ({bill.moto.yeast.format})</p>
 	</div>
 </section>

@@ -118,6 +118,7 @@ export type MotoMaterials = {
 	kojiKg: number;
 	waterL: number;
 	acidDoseMl: number;
+	acid: AcidType;
 	yeast: YeastRef;
 	riceLot: RiceLotRef;
 };
