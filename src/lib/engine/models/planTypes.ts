@@ -1,6 +1,6 @@
 import type { AcidType, KojiPreset, MineralSalt, MoromiPreset, MotoPreset, WaterProfile } from './catalogTypes';
 import type { StoredRecipeTemplate } from './templateTypes';
-import type { EngineInput, EngineOutput } from './engineTypes';
+import type { EngineInput, EngineOutput } from '../core/engineTypes';
 
 // ── Inventory refs ───────────────────────────────────────────────────────────
 

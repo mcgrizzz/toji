@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { resolvePlan } from '$lib/engine/resolvePlan';
-	import { resolveSchedule } from '$lib/engine/resolveSchedules';
-	import { sakuraGinjoPlan, sakuraGinjoPresets } from '$lib/engine/testPlanInput';
-	import { exampleKojiSchedule } from '$lib/engine/testScheduleInput';
+	import { resolvePlan } from '$lib/engine/resolvers/resolvePlan';
+	import { resolveSchedule } from '$lib/engine/resolvers/resolveSchedules';
+	import { sakuraGinjoPlan, sakuraGinjoPresets } from '$lib/engine/fixtures/testPlanInput';
+	import { exampleKojiSchedule } from '$lib/engine/fixtures/testScheduleInput';
 
 	const bill = resolvePlan(sakuraGinjoPlan, sakuraGinjoPresets);
 	const schedule = resolveSchedule(exampleKojiSchedule, '2026-03-15T08:00:00', bill);

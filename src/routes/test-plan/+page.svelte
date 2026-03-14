@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { resolvePlan } from '$lib/engine/resolvePlan';
-	import type { MaterialsBill } from '$lib/engine/planTypes';
+	import { resolvePlan } from '$lib/engine/resolvers/resolvePlan';
+	import type { MaterialsBill } from '$lib/engine/models/planTypes';
 	import {
 		kojiPreset,
 		lacticAcid,
 		sakuraGinjoPlan,
 		sakuraGinjoPresets
-	} from '$lib/engine/testPlanInput';
+	} from '$lib/engine/fixtures/testPlanInput';
 
 	const bill: MaterialsBill = resolvePlan(sakuraGinjoPlan, sakuraGinjoPresets);
 

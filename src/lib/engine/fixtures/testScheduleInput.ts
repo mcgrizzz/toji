@@ -1,4 +1,4 @@
-import type { ScheduleTemplate } from './scheduleTypes';
+import type { ScheduleTemplate } from '../models/scheduleTypes';
 
 /** Minimal koji schedule fixture — just enough to test structure, ordering, and timing */
 export const exampleKojiSchedule: ScheduleTemplate = {

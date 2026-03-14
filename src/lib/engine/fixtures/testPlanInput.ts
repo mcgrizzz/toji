@@ -1,4 +1,4 @@
-import type { RecipePlan, LoadedPresets } from './planTypes';
+import type { RecipePlan, LoadedPresets } from '../models/planTypes';
 import type {
 	KojiPreset,
 	MotoPreset,
@@ -6,8 +6,8 @@ import type {
 	WaterProfile,
 	MineralSalt,
 	AcidType
-} from './catalogTypes';
-import type { StoredRecipeTemplate } from './templateTypes';
+} from '../models/catalogTypes';
+import type { StoredRecipeTemplate } from '../models/templateTypes';
 
 // ── Built-in preset data (mirrors seed.ts) ─────────────────────────────────
 

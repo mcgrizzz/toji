@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { recipeInput } from '$lib/engine/testInput';
-	import { resolveRecipe } from '$lib/engine/resolveRecipe';
-	import type { EngineInput, EngineOutput } from '$lib/engine/engineTypes';
+	import { recipeInput } from '$lib/engine/fixtures/testInput';
+	import { resolveRecipe } from '$lib/engine/core/resolveRecipe';
+	import type { EngineInput, EngineOutput } from '$lib/engine/core/engineTypes';
 
 	let draft = $state(JSON.stringify(recipeInput, null, 2));
 

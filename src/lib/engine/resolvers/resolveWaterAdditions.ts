@@ -1,26 +1,5 @@
-import type { IonTarget, MineralSalt } from './catalogTypes';
-
-/** Total hardness expressed as CaCO3 equivalents (ppm) */
-export function calcHardnessAsCaCO3(caPpm: number, mgPpm: number): number {
-	return caPpm * 2.497 + mgPpm * 4.116;
-}
-
-/** SO4:Cl ratio — dryness/bitterness lever. Returns null when Cl = 0. */
-export function calcSO4ClRatio(so4Ppm: number, clPpm: number): number | null {
-	if (clPpm === 0) return null;
-	return so4Ppm / clPpm;
-}
-
-/** Ca:Mg ratio — fermentation character. Returns null when Mg = 0. */
-export function calcCaMgRatio(caPpm: number, mgPpm: number): number | null {
-	if (mgPpm === 0) return null;
-	return caPpm / mgPpm;
-}
-
-/** Look up a single ion's target ppm from an IonTarget array. Returns 0 if not found. */
-export function getIonPpm(ions: IonTarget[], symbol: string): number {
-	return ions.find((i) => i.symbol === symbol)?.targetPpm ?? 0;
-}
+import type { IonTarget, MineralSalt } from '../models/catalogTypes';
+import { getIonPpm } from '../math/waterMath';
 
 // ── Mineral addition solver ──────────────────────────────────────────────────
 //
@@ -31,7 +10,7 @@ export function getIonPpm(ions: IonTarget[], symbol: string): number {
 // Solver priority for sake (passed in by caller via `salts` order):
 //   MgSO4·7H2O → NaCl → KH2PO4 → CaSO4 → CaCl2 → KCl → K2SO4
 
-export function calcWaterMineralAdditions(
+export function resolveWaterAdditions(
 	waterL: number,
 	targets: IonTarget[],
 	salts: MineralSalt[],

@@ -1,4 +1,5 @@
-import type { YeastSelection, YeastViabilityModel } from './yeastTypes';
+import type { YeastSelection } from '../models/yeastTypes';
+import { calcAgeDays, calcViabilityFrac, calcViableCellsPerPackageM } from '../math/yeastMath';
 
 export type PitchingInput = {
 	/** Total moromi volume in litres (moto water + moromi water) */
@@ -26,37 +27,6 @@ export type PitchingResult = {
 	viabilityPct: number;
 };
 
-export function calcAgeDays(packageDate: string, pitchDate: string): number {
-	const msPerDay = 86_400_000;
-	return Math.max(
-		0,
-		(new Date(pitchDate).getTime() - new Date(packageDate).getTime()) / msPerDay
-	);
-}
-
-export function calcViabilityFrac(ageDays: number, model: YeastViabilityModel): number {
-	if (ageDays >= model.maxAgeDays) return 0;
-	switch (model.kind) {
-		case 'exponential':
-			return Math.max(0, model.initialViabilityFrac * Math.exp(model.decayRatePerDay * ageDays));
-		case 'linear':
-			return Math.max(0, model.initialViabilityFrac - model.dailyLossFrac * ageDays);
-	}
-}
-
-/** Calculate viable cells (in millions) for a single package given age and viability model */
-export function calcViableCells(
-	cellsPerPackageBn: number,
-	packageDate: string,
-	pitchDate: string,
-	model: YeastViabilityModel
-): number {
-	const ageDays = calcAgeDays(packageDate, pitchDate);
-	const viabilityFrac = calcViabilityFrac(ageDays, model);
-	// Convert billions → millions (* 1000)
-	return cellsPerPackageBn * 1000 * viabilityFrac;
-}
-
 /** Resolve full pitching requirements */
 export function resolvePitching(input: PitchingInput): PitchingResult {
 	const { totalMoromiVolumeL, targetPitchRateMPerMl, yeast, pitchDate } = input;
@@ -69,7 +39,7 @@ export function resolvePitching(input: PitchingInput): PitchingResult {
 	const requiredCellsM = targetPitchRateMPerMl * totalMl;
 
 	// Viable cells per package at pitch date
-	const viableCellsPerPackageM = calcViableCells(
+	const viableCellsPerPackageM = calcViableCellsPerPackageM(
 		product.cellsPerPackageBn,
 		packageDate,
 		pitchDate,
@@ -83,8 +53,8 @@ export function resolvePitching(input: PitchingInput): PitchingResult {
 		viableCellsPerPackageM > 0 ? Math.ceil(requiredCellsM / viableCellsPerPackageM) : Infinity;
 
 	// Viability percentage
-	const totalFreshCellsM = product.cellsPerPackageBn * 1000;
-	const viabilityPct = totalFreshCellsM > 0 ? (viableCellsPerPackageM / totalFreshCellsM) * 100 : 0;
+	const ageDays = calcAgeDays(packageDate, pitchDate);
+	const viabilityPct = calcViabilityFrac(ageDays, product.viability) * 100;
 
 	return {
 		requiredCellsM,

@@ -1,15 +1,15 @@
-import type { Allocation } from './engineTypes';
-import { calcAcidDoseMl } from './acidMath';
-import { calcTaneKojiG, calcCarrierG, estimateDryKojiKg } from './kojiMath';
-import { estimateTotalRiceFromGenshuVolume } from './sizing';
-import { validateRiceFracSum } from './validation';
+import type { Allocation } from '../core/engineTypes';
+import { calcAcidDoseMl } from '../math/acidMath';
+import { calcTaneKojiG, calcCarrierG, estimateDryKojiKg } from '../math/kojiMath';
+import { estimateTotalRiceFromGenshuVolume } from '../math/sizing';
+import { validateRiceFracSum } from '../core/validation';
 import {
 	calcCaMgRatio,
 	calcHardnessAsCaCO3,
 	calcSO4ClRatio,
-	calcWaterMineralAdditions,
 	getIonPpm
-} from './waterMath';
+} from '../math/waterMath';
+import { resolveWaterAdditions } from './resolveWaterAdditions';
 import type {
 	AllocationSource,
 	CompiledPlan,
@@ -21,9 +21,9 @@ import type {
 	RecipePlan,
 	RiceLotRef,
 	WaterBill
-} from './planTypes';
-import { resolveRecipe } from './resolveRecipe';
-import type { MoromiAdditionSpec } from './catalogTypes';
+} from '../models/planTypes';
+import { resolveRecipe } from '../core/resolveRecipe';
+import type { MoromiAdditionSpec } from '../models/catalogTypes';
 
 // ── Target resolution ────────────────────────────────────────────────────────
 
@@ -209,8 +209,8 @@ export function resolvePlan(plan: RecipePlan, presets: LoadedPresets): Materials
 
 		water = {
 			profileName: profile.name,
-			motoAdditions: calcWaterMineralAdditions(motoWaterL, profile.ions, presets.availableSalts),
-			moromiAdditions: calcWaterMineralAdditions(moromiWaterL, profile.ions, presets.availableSalts),
+			motoAdditions: resolveWaterAdditions(motoWaterL, profile.ions, presets.availableSalts),
+			moromiAdditions: resolveWaterAdditions(moromiWaterL, profile.ions, presets.availableSalts),
 			hardnessAsCaCO3: calcHardnessAsCaCO3(getIonPpm(profile.ions, 'Ca'), getIonPpm(profile.ions, 'Mg')),
 			so4ClRatio: calcSO4ClRatio(getIonPpm(profile.ions, 'SO4'), getIonPpm(profile.ions, 'Cl')),
 			caMgRatio: calcCaMgRatio(getIonPpm(profile.ions, 'Ca'), getIonPpm(profile.ions, 'Mg'))

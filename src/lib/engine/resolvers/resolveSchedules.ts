@@ -1,6 +1,6 @@
-import type { ScheduleTemplate } from './scheduleTypes';
-import type { ObservationPromptSpec } from './observationTypes';
-import type { MaterialsBill } from './planTypes';
+import type { ScheduleTemplate } from '../models/scheduleTypes';
+import type { ObservationPromptSpec } from '../models/observationTypes';
+import type { MaterialsBill } from '../models/planTypes';
 
 export type ResolvedStep = {
 	key: string;
