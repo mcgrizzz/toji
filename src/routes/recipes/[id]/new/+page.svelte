@@ -9,7 +9,9 @@
 	import WorkflowPreviewCard from './WorkflowPreviewCard.svelte';
 
 	// ── Resolve bundle from stable sourceId via route param ─────────────────
-	const bundle = $derived(resolveRecipeBundleBySourceId($page.params.id));
+	const bundle = $derived(
+		$page.params.id ? resolveRecipeBundleBySourceId($page.params.id) : null 
+	);
 
 	// ── Result state ────────────────────────────────────────────────────────
 	let result = $state<BrewRunResult | null>(null);
