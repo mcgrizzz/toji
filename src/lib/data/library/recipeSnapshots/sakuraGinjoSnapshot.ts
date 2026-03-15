@@ -7,15 +7,24 @@ export const sakuraGinjoSnapshot: RecipeSnapshot = {
 	name: 'Sakura Ginjo',
 	isPublic: true,
 	body: {
+		description:
+			'A light ginjo-style sake with delicate sakura petal additions during soe. ' +
+			'Uses sokujo moto with sandan moromi build and soft ginjo water profile.',
 		kojiMethodSnapshotId: 'snap-method-koji-ueda-001',
 		motoMethodSnapshotId: 'snap-method-moto-sokujo-001',
 		moromiMethodSnapshotId: 'snap-method-moromi-sandan-001',
+		waterProfileId: '00000004-0000-0000-0000-000000000001',
 		amendments: [
 			{
 				kind: 'Sakura Petals',
 				fracOfTotalRice: 0.0005,
 				placement: { where: 'moromi', stageOrdinal: 1 }
 			}
-		]
+		],
+		defaults: {
+			recommendedRiceVariety: 'Yamadanishiki',
+			recommendedPolishPct: 60,
+			recommendedAcidId: '00000005-0000-0000-0000-000000000001'
+		}
 	}
 };

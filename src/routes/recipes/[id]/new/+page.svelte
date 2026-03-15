@@ -1,19 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { sakuraGinjoBundle } from '$lib/data/recipes/sakuraGinjo';
+	import { resolveRecipeBundle } from '$lib/data/library';
 	import { resolveBrewRun } from '$lib/engine/resolvers/resolveBrewRun';
-	import type { RecipeBundle, BrewRunResult } from '$lib/app/types';
+	import type { BrewRunResult } from '$lib/app/types';
 	import type { RecipePlan } from '$lib/engine/models/planTypes';
 	import RecipePlanForm from './RecipePlanForm.svelte';
 	import MaterialsSummary from './MaterialsSummary.svelte';
 	import WorkflowPreviewCard from './WorkflowPreviewCard.svelte';
 
-	// ── Resolve bundle from route param ─────────────────────────────────────
-	const bundles: Record<string, RecipeBundle> = {
-		'sakura-ginjo': sakuraGinjoBundle
-	};
-
-	const bundle = $derived(bundles[$page.params.id]);
+	// ── Resolve bundle from snapshot via route param ────────────────────────
+	const bundle = $derived(resolveRecipeBundle($page.params.id));
 
 	// ── Result state ────────────────────────────────────────────────────────
 	let result = $state<BrewRunResult | null>(null);

@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { sakuraGinjoBundle } from '$lib/data/recipes/sakuraGinjo';
+	import { getRecipeSnapshots, resolveRecipeBundle } from '$lib/data/library';
 
-	const recipes = [sakuraGinjoBundle];
+	const snapshots = getRecipeSnapshots();
+
+	// Resolve bundles for display metadata (preset names, rice variety, etc.)
+	const bundles = snapshots.map((snap) => resolveRecipeBundle(snap.id)).filter((b) => b != null);
 </script>
 
 <main class="mx-auto max-w-3xl space-y-6 p-4">
@@ -10,7 +13,7 @@
 		<p class="text-sm text-muted-foreground">Select a recipe to start planning a brew.</p>
 	</div>
 
-	{#each recipes as recipe}
+	{#each bundles as recipe}
 		<a
 			href="/recipes/{recipe.id}/new"
 			class="block rounded-lg border bg-background p-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
