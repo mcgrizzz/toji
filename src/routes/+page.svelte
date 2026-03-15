@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getLibraryEntries, resolveRecipeBundleBySourceId } from '$lib/data/library';
+	import { getLibraryRecipeEntries, resolveRecipeBundleBySourceId } from '$lib/data/library';
 
-	const entries = getLibraryEntries();
+	const entries = getLibraryRecipeEntries();
 
 	// Resolve bundles for display metadata (preset names, rice variety, etc.)
 	const bundles = entries.map((e) => resolveRecipeBundleBySourceId(e.id)).filter((b) => b != null);

@@ -46,12 +46,17 @@ function compareSnapshotVersions(a: string, b: string): number {
 	return 0;
 }
 
-function getLatestPublicSnapshotBySourceId(sourceId: string): RecipeSnapshot | null {
-	const publicSnapshots = recipeSnapshots.filter(
-		(s) => s.sourceId === sourceId && s.isPublic
-	);
-	if (publicSnapshots.length === 0) return null;
-	return publicSnapshots.sort((a, b) => compareSnapshotVersions(b.version, a.version))[0];
+/** All public snapshots for a given sourceId, sorted newest-first by version. */
+export function getPublicRecipeSnapshotsBySourceId(sourceId: string): RecipeSnapshot[] {
+	return recipeSnapshots
+		.filter((s) => s.sourceId === sourceId && s.isPublic)
+		.sort((a, b) => compareSnapshotVersions(b.version, a.version));
+}
+
+/** The latest public snapshot for a given sourceId, or null if none exist. */
+export function getLatestPublicRecipeSnapshot(sourceId: string): RecipeSnapshot | null {
+	const snapshots = getPublicRecipeSnapshotsBySourceId(sourceId);
+	return snapshots.length > 0 ? snapshots[0] : null;
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────
@@ -71,7 +76,7 @@ export function resolveRecipeBundle(recipeSnapshotId: string): RecipeBundle | nu
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /** Stable library entries grouped by sourceId (public snapshots only). */
-export function getLibraryEntries(): LibraryRecipeEntry[] {
+export function getLibraryRecipeEntries(): LibraryRecipeEntry[] {
 	const bySourceId = new Map<string, RecipeSnapshot>();
 	for (const snap of recipeSnapshots) {
 		if (!snap.isPublic) continue;
@@ -91,7 +96,7 @@ export function getLibraryEntries(): LibraryRecipeEntry[] {
 
 /** Resolve the latest public snapshot for a sourceId into a RecipeBundle. */
 export function resolveRecipeBundleBySourceId(sourceId: string): RecipeBundle | null {
-	const snapshot = getLatestPublicSnapshotBySourceId(sourceId);
+	const snapshot = getLatestPublicRecipeSnapshot(sourceId);
 	if (!snapshot) return null;
 	return buildBundleFromSnapshot(snapshot);
 }
