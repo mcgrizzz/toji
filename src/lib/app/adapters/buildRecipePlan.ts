@@ -19,7 +19,7 @@ export function buildRecipePlan(params: {
 	const { recipe, target, koji, moto, moromiStages, water } = params;
 
 	return {
-		recipeSpecId: recipe.sourceId,
+		recipeSnapshotId: recipe.id,
 		target,
 		koji,
 		moto: {

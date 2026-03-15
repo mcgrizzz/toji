@@ -47,7 +47,7 @@ export type PlanTarget =
 // ── Plan ─────────────────────────────────────────────────────────────────────
 
 export type RecipePlan = {
-	recipeSpecId: string;
+	recipeSnapshotId: string;
 	target: PlanTarget;
 	koji: KojiPlanSelection;
 	moto: MotoPlanSelection;

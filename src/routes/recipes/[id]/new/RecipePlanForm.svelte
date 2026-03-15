@@ -43,7 +43,7 @@
 		const kakeLotRef = riceLotToRef(selectedMainRiceLot!);
 
 		const plan: RecipePlan = {
-			recipeSpecId: bundle.template.id,
+			recipeSnapshotId: bundle.id,
 			target: { kind: targetKind, value: targetValue },
 			koji: premadeKoji
 				? { mode: 'premade' }

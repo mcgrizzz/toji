@@ -45,7 +45,7 @@ const mainLot = { lotId: 'lot-b', variety: 'Gohyakumangoku', polishPct: 60, lotL
 
 /** 6.7L genshu target, make koji, lots A+B */
 export const sakuraGinjoPlan: RecipePlan = {
-	recipeSpecId: 'sakura-ginjo',
+	recipeSnapshotId: 'snap-recipe-sakura-ginjo-001',
 	target: { kind: 'genshu_volume_L', value: 6.7 },
 	koji: {
 		mode: 'make',
@@ -69,7 +69,7 @@ export const sakuraGinjoPlan: RecipePlan = {
 
 /** Same as sakuraGinjoPlan but with premade koji */
 export const premadeKojiPlan: RecipePlan = {
-	recipeSpecId: 'sakura-ginjo',
+	recipeSnapshotId: 'snap-recipe-sakura-ginjo-001',
 	target: { kind: 'genshu_volume_L', value: 6.7 },
 	koji: { mode: 'premade' },
 	moto: {
@@ -89,7 +89,7 @@ export const premadeKojiPlan: RecipePlan = {
 
 /** Same as sakuraGinjoPlan but with no water profile */
 export const noWaterPlan: RecipePlan = {
-	recipeSpecId: 'sakura-ginjo',
+	recipeSnapshotId: 'snap-recipe-sakura-ginjo-001',
 	target: { kind: 'genshu_volume_L', value: 6.7 },
 	koji: {
 		mode: 'make',
