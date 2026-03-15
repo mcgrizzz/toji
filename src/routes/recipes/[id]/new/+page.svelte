@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { resolveRecipeBundle } from '$lib/data/library';
+	import { resolveRecipeBundleBySourceId } from '$lib/data/library';
 	import { resolveBrewRun } from '$lib/engine/resolvers/resolveBrewRun';
 	import type { BrewRunResult } from '$lib/app/types';
 	import type { RecipePlan } from '$lib/engine/models/planTypes';
@@ -8,8 +8,8 @@
 	import MaterialsSummary from './MaterialsSummary.svelte';
 	import WorkflowPreviewCard from './WorkflowPreviewCard.svelte';
 
-	// ── Resolve bundle from snapshot via route param ────────────────────────
-	const bundle = $derived(resolveRecipeBundle($page.params.id));
+	// ── Resolve bundle from stable sourceId via route param ─────────────────
+	const bundle = $derived(resolveRecipeBundleBySourceId($page.params.id));
 
 	// ── Result state ────────────────────────────────────────────────────────
 	let result = $state<BrewRunResult | null>(null);
@@ -18,6 +18,7 @@
 	function preview(plan: RecipePlan) {
 		error = '';
 		result = null;
+		if (!bundle) return;
 
 		try {
 			result = resolveBrewRun({

@@ -1,6 +1,7 @@
 import type { RecipeBundle } from '$lib/app/types';
 import type { RecipeSnapshot } from '$lib/app/models/recipes';
 import type { MethodSnapshot } from '$lib/app/models/methods';
+import type { LibraryRecipeEntry } from '$lib/app/models/library';
 import { buildRecipeBundle } from '$lib/app/adapters/buildRecipeBundle';
 
 // ── Snapshots ───────────────────────────────────────────────────────────────
@@ -33,7 +34,27 @@ const acidById: Record<string, AcidType> = {
 	[lacticAcid88.id]: lacticAcid88
 };
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function compareSnapshotVersions(a: string, b: string): number {
+	const pa = a.split('.').map(Number);
+	const pb = b.split('.').map(Number);
+	for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+		const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+		if (diff !== 0) return diff;
+	}
+	return 0;
+}
+
+function getLatestPublicSnapshotBySourceId(sourceId: string): RecipeSnapshot | null {
+	const publicSnapshots = recipeSnapshots.filter(
+		(s) => s.sourceId === sourceId && s.isPublic
+	);
+	if (publicSnapshots.length === 0) return null;
+	return publicSnapshots.sort((a, b) => compareSnapshotVersions(b.version, a.version))[0];
+}
+
+// ── Internal ────────────────────────────────────────────────────────────────
 
 /** All recipe snapshots available in the library. */
 export function getRecipeSnapshots(): RecipeSnapshot[] {
@@ -44,7 +65,40 @@ export function getRecipeSnapshots(): RecipeSnapshot[] {
 export function resolveRecipeBundle(recipeSnapshotId: string): RecipeBundle | null {
 	const recipe = recipeSnapshots.find((r) => r.id === recipeSnapshotId);
 	if (!recipe) return null;
+	return buildBundleFromSnapshot(recipe);
+}
 
+// ── Public API ──────────────────────────────────────────────────────────────
+
+/** Stable library entries grouped by sourceId (public snapshots only). */
+export function getLibraryEntries(): LibraryRecipeEntry[] {
+	const bySourceId = new Map<string, RecipeSnapshot>();
+	for (const snap of recipeSnapshots) {
+		if (!snap.isPublic) continue;
+		const existing = bySourceId.get(snap.sourceId);
+		if (!existing || compareSnapshotVersions(snap.version, existing.version) > 0) {
+			bySourceId.set(snap.sourceId, snap);
+		}
+	}
+	return Array.from(bySourceId.values()).map((snap) => ({
+		id: snap.sourceId,
+		name: snap.name,
+		description: snap.body.description,
+		latestSnapshotId: snap.id,
+		version: snap.version
+	}));
+}
+
+/** Resolve the latest public snapshot for a sourceId into a RecipeBundle. */
+export function resolveRecipeBundleBySourceId(sourceId: string): RecipeBundle | null {
+	const snapshot = getLatestPublicSnapshotBySourceId(sourceId);
+	if (!snapshot) return null;
+	return buildBundleFromSnapshot(snapshot);
+}
+
+// ── Bundle builder ──────────────────────────────────────────────────────────
+
+function buildBundleFromSnapshot(recipe: RecipeSnapshot): RecipeBundle | null {
 	const kojiMethod = methodSnapshotById[recipe.body.kojiMethodSnapshotId];
 	const motoMethod = methodSnapshotById[recipe.body.motoMethodSnapshotId];
 	const moromiMethod = methodSnapshotById[recipe.body.moromiMethodSnapshotId];
