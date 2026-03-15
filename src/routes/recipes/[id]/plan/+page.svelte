@@ -1,23 +1,26 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { resolveRecipeBundle } from '$lib/data/library';
+	import { getRecipeById } from '$lib/data/recipes/recipeStore.svelte';
+	import { resolveBundleFromSource } from '$lib/data/lookups';
 	import { resolveBrewRun } from '$lib/engine/resolvers/resolveBrewRun';
 	import type { BrewRunResult } from '$lib/app/types';
-	import type { RecipePlan } from '$lib/engine/models/planTypes';
+	import type { RecipePlanDraft } from '$lib/engine/models/planTypes';
 	import RecipePlanForm from './RecipePlanForm.svelte';
 	import MaterialsSummary from './MaterialsSummary.svelte';
 	import WorkflowPreviewCard from './WorkflowPreviewCard.svelte';
 
-	// ── Resolve bundle from snapshot id via route param ─────────────────────
-	const bundle = $derived(
-		$page.params.id ? resolveRecipeBundle($page.params.id) : null
+	// ── Resolve recipe from store via route param ───────────────────────────
+	const recipe = $derived(
+		$page.params.id ? getRecipeById($page.params.id) : undefined
 	);
+
+	const bundle = $derived(recipe ? resolveBundleFromSource(recipe) : null);
 
 	// ── Result state ────────────────────────────────────────────────────────
 	let result = $state<BrewRunResult | null>(null);
 	let error = $state('');
 
-	function preview(plan: RecipePlan) {
+	function preview(plan: RecipePlanDraft) {
 		error = '';
 		result = null;
 		if (!bundle) return;
@@ -34,16 +37,16 @@
 	}
 </script>
 
-{#if !bundle}
+{#if !recipe || !bundle}
 	<main class="mx-auto max-w-3xl p-4">
-		<p class="text-destructive">Recipe "{$page.params.id}" not found.</p>
-		<a href="/" class="text-sm text-primary hover:underline">&larr; Back to recipes</a>
+		<p class="text-destructive">Recipe not found.</p>
+		<a href="/recipes" class="text-sm text-primary hover:underline">&larr; My Recipes</a>
 	</main>
 {:else}
 	<main class="mx-auto max-w-4xl space-y-6 p-4">
 		<div>
-			<a href="/" class="text-xs text-muted-foreground hover:underline">&larr; Recipes</a>
-			<h1 class="text-lg font-semibold">{bundle.name} — New Plan</h1>
+			<a href="/recipes" class="text-xs text-muted-foreground hover:underline">&larr; My Recipes</a>
+			<h1 class="text-lg font-semibold">{bundle.name} — Plan</h1>
 			{#if bundle.description}
 				<p class="text-sm text-muted-foreground">{bundle.description}</p>
 			{/if}

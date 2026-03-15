@@ -18,3 +18,10 @@ export type RecipeBody = {
 
 export type Recipe = WorkingCopy<RecipeBody>;
 export type RecipeSnapshot = Snapshot<RecipeBody>;
+
+/** Structural type satisfied by both Recipe and RecipeSnapshot. */
+export type RecipeSource = {
+	id: string;
+	name: string;
+	body: RecipeBody;
+};

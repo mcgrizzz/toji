@@ -1,6 +1,5 @@
-import type { RecipeSnapshot } from '$lib/app/models/recipes';
 import type {
-	RecipePlan,
+	RecipePlanDraft,
 	PlanTarget,
 	KojiPlanSelection,
 	RiceLotRef,
@@ -8,18 +7,18 @@ import type {
 } from '$lib/engine/models/planTypes';
 import type { AcidType, WaterProfile } from '$lib/engine/models/catalogTypes';
 
-export function buildRecipePlan(params: {
-	recipe: RecipeSnapshot;
+export function buildRecipePlanDraft(params: {
+	recipeId: string;
 	target: PlanTarget;
 	koji: KojiPlanSelection;
 	moto: { riceLot: RiceLotRef; yeast: YeastRef; acid: AcidType };
 	moromiStages: { stageOrdinal: number; riceLot: RiceLotRef }[];
 	water: WaterProfile | null;
-}): RecipePlan {
-	const { recipe, target, koji, moto, moromiStages, water } = params;
+}): RecipePlanDraft {
+	const { recipeId, target, koji, moto, moromiStages, water } = params;
 
 	return {
-		recipeSnapshotId: recipe.id,
+		recipeId,
 		target,
 		koji,
 		moto: {

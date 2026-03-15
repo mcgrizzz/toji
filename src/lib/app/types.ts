@@ -1,4 +1,4 @@
-import type { LoadedPresets, MaterialsBill, RecipePlan } from '$lib/engine/models/planTypes';
+import type { LoadedPresets, MaterialsBill, RecipePlan, RecipePlanDraft } from '$lib/engine/models/planTypes';
 import type { StoredRecipeTemplate } from '$lib/engine/models/templateTypes';
 import type { WorkflowKind } from '$lib/engine/models/scheduleTypes';
 import type { ScheduleTemplate } from '$lib/engine/models/scheduleTypes';
@@ -26,7 +26,7 @@ export type RecipeBundle = {
 // ── Brew run orchestrator ───────────────────────────────────────────────────
 
 export type BrewRunInput = {
-	plan: RecipePlan;
+	plan: RecipePlan | RecipePlanDraft;
 	presets: LoadedPresets;
 	schedules?: Partial<Record<WorkflowKind, ScheduleTemplate>>;
 	workflowStartTimes?: Partial<Record<WorkflowKind, string>>;
@@ -37,7 +37,7 @@ export type BrewRunInput = {
 };
 
 export type BrewRunResult = {
-	plan: RecipePlan;
+	plan: RecipePlan | RecipePlanDraft;
 	materials: MaterialsBill;
 	pitching?: PitchingResult;
 	schedules?: Partial<Record<WorkflowKind, ResolvedSchedule>>;

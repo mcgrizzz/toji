@@ -1,12 +1,12 @@
 import type { RecipeBundle } from '$lib/app/types';
 import { buildLoadedPresets } from './buildLoadedPresets';
 import type { MethodSnapshot, KojiMethodBody, MotoMethodBody, MoromiMethodBody } from '$lib/app/models/methods';
-import type { RecipeSnapshot } from '$lib/app/models/recipes';
+import type { RecipeSource } from '$lib/app/models/recipes';
 import type { WaterProfile, MineralSalt, AcidType } from '$lib/engine/models/catalogTypes';
 import type { WorkflowKind, ScheduleTemplate } from '$lib/engine/models/scheduleTypes';
 
 export function buildRecipeBundle(params: {
-	recipe: RecipeSnapshot;
+	recipe: RecipeSource;
 	kojiMethod: MethodSnapshot;
 	motoMethod: MethodSnapshot;
 	moromiMethod: MethodSnapshot;

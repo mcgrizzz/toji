@@ -1,5 +1,5 @@
 import type { MethodSnapshot, KojiMethodBody, MotoMethodBody, MoromiMethodBody } from '$lib/app/models/methods';
-import type { RecipeSnapshot } from '$lib/app/models/recipes';
+import type { RecipeSource } from '$lib/app/models/recipes';
 import type { LoadedPresets } from '$lib/engine/models/planTypes';
 import type { StoredRecipeTemplate } from '$lib/engine/models/templateTypes';
 import type { WaterProfile, MineralSalt } from '$lib/engine/models/catalogTypes';
@@ -10,7 +10,7 @@ export function buildLoadedPresets(params: {
 	moromiMethod: MethodSnapshot;
 	waterProfile: WaterProfile | null;
 	availableSalts: MineralSalt[];
-	recipe: RecipeSnapshot;
+	recipe: RecipeSource;
 }): LoadedPresets {
 	const { kojiMethod, motoMethod, moromiMethod, waterProfile, availableSalts, recipe } = params;
 

@@ -1,12 +1,12 @@
 <script lang="ts">
 	import type { RecipeBundle } from '$lib/app/types';
-	import type { RecipePlan } from '$lib/engine/models/planTypes';
+	import type { RecipePlanDraft } from '$lib/engine/models/planTypes';
 	import { riceLots, kojiStrains, yeastStocks } from '$lib/data/inventory';
 	import { riceLotToRef, kojiStrainToRef, yeastStockToRef } from '$lib/app/adapters/inventoryToRefs';
 
 	type Props = {
 		bundle: RecipeBundle;
-		onpreview: (plan: RecipePlan) => void;
+		onpreview: (plan: RecipePlanDraft) => void;
 	};
 
 	let { bundle, onpreview }: Props = $props();
@@ -42,8 +42,8 @@
 
 		const kakeLotRef = riceLotToRef(selectedMainRiceLot!);
 
-		const plan: RecipePlan = {
-			recipeSnapshotId: bundle.id,
+		const plan: RecipePlanDraft = {
+			recipeId: bundle.id,
 			target: { kind: targetKind, value: targetValue },
 			koji: premadeKoji
 				? { mode: 'premade' }

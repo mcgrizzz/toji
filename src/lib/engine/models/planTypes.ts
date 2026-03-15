@@ -56,6 +56,16 @@ export type RecipePlan = {
 	water: WaterProfile | null;
 };
 
+/** Draft plan built from a mutable working recipe. Not yet tied to a frozen snapshot. */
+export type RecipePlanDraft = {
+	recipeId: string;
+	target: PlanTarget;
+	koji: KojiPlanSelection;
+	moto: MotoPlanSelection;
+	moromi: MoromiPlanSelection;
+	water: WaterProfile | null;
+};
+
 // ── Resolver inputs ──────────────────────────────────────────────────────────
 
 export type LoadedPresets = {

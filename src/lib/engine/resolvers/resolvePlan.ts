@@ -19,6 +19,7 @@ import type {
 	MoromiStageMaterials,
 	MotoMaterials,
 	RecipePlan,
+	RecipePlanDraft,
 	RiceLotRef,
 	WaterBill
 } from '../models/planTypes';
@@ -27,7 +28,7 @@ import type { MoromiAdditionSpec } from '../models/catalogTypes';
 
 // ── Target resolution ────────────────────────────────────────────────────────
 
-function resolveTarget(plan: RecipePlan): number {
+function resolveTarget(plan: RecipePlan | RecipePlanDraft): number {
 	if (plan.target.kind === 'total_rice_kg') {
 		return plan.target.value;
 	}
@@ -37,7 +38,7 @@ function resolveTarget(plan: RecipePlan): number {
 // ── Compile plan to engine input ─────────────────────────────────────────────
 
 export function compilePlanToEngineInput(
-	plan: RecipePlan,
+	plan: RecipePlan | RecipePlanDraft,
 	presets: LoadedPresets,
 	totalRiceKg: number
 ): CompiledPlan {
@@ -102,7 +103,7 @@ export function compilePlanToEngineInput(
 
 // ── Resolve lot for a moromi stage ──────────────────────────────────────────
 
-function moromiLot(plan: RecipePlan, stage: MoromiAdditionSpec): RiceLotRef {
+function moromiLot(plan: RecipePlan | RecipePlanDraft, stage: MoromiAdditionSpec): RiceLotRef {
 	const found = plan.moromi.stages.find((s) => s.stageOrdinal === stage.ordinal);
 	// Fall back to moto lot if not specified
 	return found?.riceLot ?? plan.moto.riceLot;
@@ -110,7 +111,7 @@ function moromiLot(plan: RecipePlan, stage: MoromiAdditionSpec): RiceLotRef {
 
 // ── Main resolver ────────────────────────────────────────────────────────────
 
-export function resolvePlan(plan: RecipePlan, presets: LoadedPresets): MaterialsBill {
+export function resolvePlan(plan: RecipePlan | RecipePlanDraft, presets: LoadedPresets): MaterialsBill {
 	const totalRiceKg = resolveTarget(plan);
 	const compiled = compilePlanToEngineInput(plan, presets, totalRiceKg);
 	const engineOutput = resolveRecipe(compiled.engineInput);
