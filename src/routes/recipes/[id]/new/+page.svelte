@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { resolveRecipeBundleBySourceId } from '$lib/data/library';
+	import { resolveRecipeBundle } from '$lib/data/library';
 	import { resolveBrewRun } from '$lib/engine/resolvers/resolveBrewRun';
 	import type { BrewRunResult } from '$lib/app/types';
 	import type { RecipePlan } from '$lib/engine/models/planTypes';
@@ -8,9 +8,9 @@
 	import MaterialsSummary from './MaterialsSummary.svelte';
 	import WorkflowPreviewCard from './WorkflowPreviewCard.svelte';
 
-	// ── Resolve bundle from stable sourceId via route param ─────────────────
+	// ── Resolve bundle from snapshot id via route param ─────────────────────
 	const bundle = $derived(
-		$page.params.id ? resolveRecipeBundleBySourceId($page.params.id) : null 
+		$page.params.id ? resolveRecipeBundle($page.params.id) : null
 	);
 
 	// ── Result state ────────────────────────────────────────────────────────

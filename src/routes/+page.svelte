@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { getLibraryRecipeEntries, resolveRecipeBundleBySourceId } from '$lib/data/library';
+	import { getLibraryRecipeEntries, resolveRecipeBundle } from '$lib/data/library';
 
 	const entries = getLibraryRecipeEntries();
 
 	// Resolve bundles for display metadata (preset names, rice variety, etc.)
-	const bundles = entries.map((e) => resolveRecipeBundleBySourceId(e.id)).filter((b) => b != null);
+	const bundles = entries.map((e) => resolveRecipeBundle(e.latestSnapshotId)).filter((b) => b != null);
 </script>
 
 <main class="mx-auto max-w-3xl space-y-6 p-4">

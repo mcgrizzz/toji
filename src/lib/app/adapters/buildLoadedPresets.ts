@@ -15,7 +15,7 @@ export function buildLoadedPresets(params: {
 	const { kojiMethod, motoMethod, moromiMethod, waterProfile, availableSalts, recipe } = params;
 
 	const spec: StoredRecipeTemplate = {
-		id: recipe.sourceId,
+		id: recipe.id,
 		name: recipe.name,
 		kojiPresetRef: kojiMethod.id,
 		motoPresetRef: motoMethod.id,

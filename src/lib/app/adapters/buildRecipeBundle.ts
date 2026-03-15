@@ -36,7 +36,7 @@ export function buildRecipeBundle(params: {
 	if (moromiSchedule) schedules.moromi = moromiSchedule;
 
 	return {
-		id: recipe.sourceId,
+		id: recipe.id,
 		name: recipe.name,
 		description: recipe.body.description,
 		template: presets.spec,

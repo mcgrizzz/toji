@@ -12,7 +12,7 @@ export { kojiPreset, motoPreset, moromiPreset, ginjo1, lacticAcid, availableSalt
 // ── Spec (built from catalog imports) ────────────────────────────────────────
 
 export const spec: StoredRecipeTemplate = {
-	id: 'sakura-ginjo',
+	id: 'snap-recipe-sakura-ginjo-001',
 	name: 'Sakura Ginjo',
 	kojiPresetRef: kojiPreset.id,
 	motoPresetRef: motoPreset.id,
