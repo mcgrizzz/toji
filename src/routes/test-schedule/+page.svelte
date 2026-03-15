@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolveSchedule } from '$lib/engine/resolvers/resolveSchedules';
-	import { uedaKojiSchedule } from '$lib/engine/fixtures/testScheduleInput';
+	import { uedaKojiSchedule } from '$lib/data/schedules/uedaKojiSchedule';
 
 	const schedule = resolveSchedule(uedaKojiSchedule, '2026-03-15T08:00:00');
 

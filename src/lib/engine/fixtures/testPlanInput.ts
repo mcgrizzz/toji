@@ -1,138 +1,15 @@
 import type { RecipePlan, LoadedPresets } from '../models/planTypes';
-import type {
-	KojiPreset,
-	MotoPreset,
-	MoromiPreset,
-	WaterProfile,
-	MineralSalt,
-	AcidType
-} from '../models/catalogTypes';
 import type { StoredRecipeTemplate } from '../models/templateTypes';
+import { uedaStandard as kojiPreset } from '$lib/data/catalog/kojiPresets';
+import { sokujoStandard as motoPreset } from '$lib/data/catalog/motoPresets';
+import { sandanStandard as moromiPreset } from '$lib/data/catalog/moromiPresets';
+import { ginjo1 } from '$lib/data/catalog/waterProfiles';
+import { lacticAcid88 as lacticAcid } from '$lib/data/catalog/acids';
+import { availableSalts } from '$lib/data/catalog/salts';
 
-// ── Built-in preset data (mirrors seed.ts) ─────────────────────────────────
+export { kojiPreset, motoPreset, moromiPreset, ginjo1, lacticAcid, availableSalts };
 
-export const kojiPreset: KojiPreset = {
-	id: '00000001-0000-0000-0000-000000000001',
-	name: 'Ueda Standard',
-	isBuiltIn: true,
-	kojiGPerKgRice: 0.08,
-	carrier: 'Toasted Rice Flour',
-	carrierRatioGPerG: 5
-};
-
-export const motoPreset: MotoPreset = {
-	id: '00000002-0000-0000-0000-000000000001',
-	name: 'Sokujo Standard',
-	isBuiltIn: true,
-	riceFrac: 0.07,
-	kojiFrac: 0.3,
-	waterLPerKg: 1.07,
-	yeastPitchRateMPerMl: 3,
-	acidRefMlPerL: 0.03,
-	acidRefStrengthPct: 88
-};
-
-export const moromiPreset: MoromiPreset = {
-	id: '00000003-0000-0000-0000-000000000001',
-	name: 'Sandan Standard',
-	isBuiltIn: true,
-	stages: [
-		{ name: 'Soe', ordinal: 1, riceFrac: 0.15, kojiFrac: 0.28, waterLPerKg: 0.92 },
-		{ name: 'Naka', ordinal: 2, riceFrac: 0.3, kojiFrac: 0.21, waterLPerKg: 1.2 },
-		{ name: 'Tome', ordinal: 3, riceFrac: 0.48, kojiFrac: 0.21, waterLPerKg: 1.2 }
-	]
-};
-
-export const ginjo1: WaterProfile = {
-	id: '00000004-0000-0000-0000-000000000001',
-	name: 'Ginjo 1',
-	isBuiltIn: true,
-	ions: [
-		{ symbol: 'Ca', targetPpm: 10 },
-		{ symbol: 'Mg', targetPpm: 3 }
-	]
-};
-
-export const lacticAcid: AcidType = {
-	id: '00000005-0000-0000-0000-000000000001',
-	name: 'Lactic 88%',
-	isBuiltIn: true,
-	strengthPct: 88,
-	relativeAcidity: 1.0
-};
-
-export const availableSalts: MineralSalt[] = [
-	{
-		id: '00000006-0000-0000-0000-000000000001',
-		name: 'MgSO4·7H2O (Epsom Salt)',
-		isBuiltIn: true,
-		primaryIon: 'Mg',
-		contributions: [
-			{ ionSymbol: 'Mg', massGPerGSalt: 24.31 / 246.47 },
-			{ ionSymbol: 'SO4', massGPerGSalt: 96.06 / 246.47 }
-		]
-	},
-	{
-		id: '00000006-0000-0000-0000-000000000002',
-		name: 'NaCl (Table Salt)',
-		isBuiltIn: true,
-		primaryIon: 'Na',
-		contributions: [
-			{ ionSymbol: 'Na', massGPerGSalt: 22.99 / 58.44 },
-			{ ionSymbol: 'Cl', massGPerGSalt: 35.45 / 58.44 }
-		]
-	},
-	{
-		id: '00000006-0000-0000-0000-000000000003',
-		name: 'KH2PO4 (Monopotassium Phosphate)',
-		isBuiltIn: true,
-		primaryIon: 'PO4',
-		contributions: [
-			{ ionSymbol: 'K', massGPerGSalt: 39.10 / 136.09 },
-			{ ionSymbol: 'PO4', massGPerGSalt: 94.97 / 136.09 }
-		]
-	},
-	{
-		id: '00000006-0000-0000-0000-000000000004',
-		name: 'CaSO4 (Gypsum)',
-		isBuiltIn: true,
-		primaryIon: 'Ca',
-		contributions: [
-			{ ionSymbol: 'Ca', massGPerGSalt: 40.08 / 136.14 },
-			{ ionSymbol: 'SO4', massGPerGSalt: 96.06 / 136.14 }
-		]
-	},
-	{
-		id: '00000006-0000-0000-0000-000000000005',
-		name: 'CaCl2 (Calcium Chloride)',
-		isBuiltIn: true,
-		primaryIon: 'Ca',
-		contributions: [
-			{ ionSymbol: 'Ca', massGPerGSalt: 40.08 / 110.98 },
-			{ ionSymbol: 'Cl', massGPerGSalt: 70.90 / 110.98 }
-		]
-	},
-	{
-		id: '00000006-0000-0000-0000-000000000006',
-		name: 'KCl (Potassium Chloride)',
-		isBuiltIn: true,
-		primaryIon: 'K',
-		contributions: [
-			{ ionSymbol: 'K', massGPerGSalt: 39.10 / 74.55 },
-			{ ionSymbol: 'Cl', massGPerGSalt: 35.45 / 74.55 }
-		]
-	},
-	{
-		id: '00000006-0000-0000-0000-000000000007',
-		name: 'K2SO4 (Potassium Sulfate)',
-		isBuiltIn: true,
-		primaryIon: 'K',
-		contributions: [
-			{ ionSymbol: 'K', massGPerGSalt: 78.20 / 174.26 },
-			{ ionSymbol: 'SO4', massGPerGSalt: 96.06 / 174.26 }
-		]
-	}
-];
+// ── Spec (built from catalog imports) ────────────────────────────────────────
 
 export const spec: StoredRecipeTemplate = {
 	id: 'sakura-ginjo',
@@ -233,4 +110,3 @@ export const noWaterPlan: RecipePlan = {
 	},
 	water: null
 };
-
