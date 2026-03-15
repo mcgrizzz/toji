@@ -94,13 +94,6 @@ export function getLibraryRecipeEntries(): LibraryRecipeEntry[] {
 	}));
 }
 
-/** Resolve the latest public snapshot for a sourceId into a RecipeBundle. */
-export function resolveRecipeBundleBySourceId(sourceId: string): RecipeBundle | null {
-	const snapshot = getLatestPublicRecipeSnapshot(sourceId);
-	if (!snapshot) return null;
-	return buildBundleFromSnapshot(snapshot);
-}
-
 // ── Bundle builder ──────────────────────────────────────────────────────────
 
 function buildBundleFromSnapshot(recipe: RecipeSnapshot): RecipeBundle | null {
