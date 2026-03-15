@@ -12,14 +12,13 @@
 
 	{#each recipes as recipe (recipe.id)}
 		<a
-			href="/recipes/{recipe.id}/plan"
+			href="/recipes/{recipe.id}"
 			class="block rounded-lg border bg-background p-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
 		>
 			<h2 class="text-base font-semibold">{recipe.name}</h2>
 			{#if recipe.body.description}
 				<p class="mt-1 text-sm text-muted-foreground">{recipe.body.description}</p>
 			{/if}
-			<p class="mt-3 text-sm font-medium text-primary">Plan brew &rarr;</p>
 		</a>
 	{:else}
 		<div class="rounded-lg border border-dashed bg-background p-6 text-center">

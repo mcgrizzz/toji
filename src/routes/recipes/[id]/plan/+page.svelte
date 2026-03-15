@@ -45,7 +45,7 @@
 {:else}
 	<main class="mx-auto max-w-4xl space-y-6 p-4">
 		<div>
-			<a href="/recipes" class="text-xs text-muted-foreground hover:underline">&larr; My Recipes</a>
+			<a href="/recipes/{$page.params.id}" class="text-xs text-muted-foreground hover:underline">&larr; {bundle.name}</a>
 			<h1 class="text-lg font-semibold">{bundle.name} — Plan</h1>
 			{#if bundle.description}
 				<p class="text-sm text-muted-foreground">{bundle.description}</p>
