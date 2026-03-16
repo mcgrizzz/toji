@@ -10,80 +10,105 @@ export const User = table(
   }
 );
 
-// ── Preset tables ─────────────────────────────────────────────────────────────
+// ── Shared type objects ─────────────────────────────────────────────────────
 
-export const KojiPresets = table(
-  { name: 'koji_presets', public: true },
-  {
-    id: t.string().primaryKey(),
-    name: t.string(),
-    isBuiltIn: t.bool(),
-    /** Grams of tane-koji per kg of koji rice */
-    kojiGPerKgRice: t.f64(),
-    /** Carrier material name (e.g. "Toasted Rice Flour") */
-    carrier: t.string(),
-    /** Carrier : tane-koji mass ratio (g carrier per g tane-koji) */
-    carrierRatioGPerG: t.f64(),
-    createdAt: t.timestamp(),
-    updatedAt: t.timestamp(),
-  }
-);
+// Schedule types (process definition for methods)
 
-export const MotoPresets = table(
-  { name: 'moto_presets', public: true },
-  {
-    id: t.string().primaryKey(),
-    name: t.string(),
-    isBuiltIn: t.bool(),
-    /** Fraction of total batch rice in moto */
-    riceFrac: t.f64(),
-    /** Fraction of moto rice that becomes koji */
-    kojiFrac: t.f64(),
-    /** Litres of water per kg of moto rice */
-    waterLPerKg: t.f64(),
-    /** Yeast pitch rate: million cells per mL of moromi volume */
-    yeastPitchRateMPerMl: t.f64(),
-    /** Reference acid dose in mL per L of moto water */
-    acidRefMlPerL: t.f64(),
-    /** Strength of the reference acid (%) */
-    acidRefStrengthPct: t.f64(),
-    createdAt: t.timestamp(),
-    updatedAt: t.timestamp(),
-  }
-);
+const GoalSpec = t.object('GoalSpec', { description: t.string() });
+const CheckSpec = t.object('CheckSpec', { description: t.string() });
+const ActionSpec = t.object('ActionSpec', { description: t.string() });
 
-export const MoromiPresets = table(
-  { name: 'moromi_presets', public: true },
-  {
-    id: t.string().primaryKey(),
-    name: t.string(),
-    isBuiltIn: t.bool(),
-    createdAt: t.timestamp(),
-    updatedAt: t.timestamp(),
-  }
-);
+const ScheduleStep = t.object('ScheduleStep', {
+  key: t.string(),
+  label: t.string(),
+  atH: t.f64(),
+  durationH: t.option(t.f64()),
+  notes: t.array(t.string()),
+  goals: t.array(GoalSpec),
+  checks: t.array(CheckSpec),
+  actions: t.array(ActionSpec),
+});
 
-export const MoromiStages = table(
-  {
-    name: 'moromi_stages',
-    public: true,
-    indexes: [{ accessor: 'byMoromiPresetId', algorithm: 'btree', columns: ['moromiPresetId'] }],
-  },
-  {
-    id: t.string().primaryKey(),
-    moromiPresetId: t.string(),
-    name: t.string(),
-    /** Ordinal position for material additions: 1=soe, 2=naka, 3=tome.
-     *  Odori is a schedule phase, not a material addition, and must NOT appear here. */
-    ordinal: t.i32(),
-    /** Fraction of total batch rice in this stage */
-    riceFrac: t.f64(),
-    /** Fraction of this stage's rice that becomes koji */
-    kojiFrac: t.f64(),
-    /** Litres of water per kg of this stage's rice */
-    waterLPerKg: t.f64(),
-  }
-);
+const Schedule = t.object('Schedule', {
+  name: t.string(),
+  steps: t.array(ScheduleStep),
+});
+
+// Method body types (config + optional schedule)
+
+const KojiMethodBody = t.object('KojiMethodBody', {
+  kojiGPerKgRice: t.f64(),
+  carrier: t.string(),
+  carrierRatioGPerG: t.f64(),
+  schedule: t.option(Schedule),
+});
+
+const MotoMethodBody = t.object('MotoMethodBody', {
+  riceFrac: t.f64(),
+  kojiFrac: t.f64(),
+  waterLPerKg: t.f64(),
+  yeastPitchRateMPerMl: t.f64(),
+  acidRefMlPerL: t.f64(),
+  acidRefStrengthPct: t.f64(),
+  schedule: t.option(Schedule),
+});
+
+const MoromiStageSpec = t.object('MoromiStageSpec', {
+  name: t.string(),
+  ordinal: t.i32(),
+  riceFrac: t.f64(),
+  kojiFrac: t.f64(),
+  waterLPerKg: t.f64(),
+});
+
+const MoromiMethodBody = t.object('MoromiMethodBody', {
+  stages: t.array(MoromiStageSpec),
+  schedule: t.option(Schedule),
+});
+
+const MethodBody = t.enum('MethodBody', {
+  Koji: KojiMethodBody,
+  Moto: MotoMethodBody,
+  Moromi: MoromiMethodBody,
+});
+
+const MethodKind = t.enum('MethodKind', ['koji', 'moto', 'moromi']);
+
+// Amendment types (embedded array on Recipes)
+
+const AmendmentPlacement = t.enum('AmendmentPlacement', {
+  Moto: t.unit(),
+  Moromi: t.object('MoromiPlacement', { stageOrdinal: t.i32() }),
+});
+
+const AmendmentSpec = t.object('AmendmentSpec', {
+  kind: t.string(),
+  fracOfTotalRice: t.f64(),
+  placement: AmendmentPlacement,
+  ordinal: t.i32(),
+});
+
+// Batch selection body
+
+const TargetKind = t.enum('TargetKind', ['genshu_volume_L', 'total_rice_kg']);
+
+const MoromiStageLot = t.object('MoromiStageLot', {
+  stageOrdinal: t.i32(),
+  riceLotId: t.string(),
+});
+
+const BatchSelections = t.object('BatchSelections', {
+  targetKind: TargetKind,
+  targetValue: t.f64(),
+  usePremadeKoji: t.bool(),
+  kojiRiceLotId: t.option(t.string()),
+  kojiStrainId: t.option(t.string()),
+  motoRiceLotId: t.option(t.string()),
+  yeastId: t.option(t.string()),
+  acidTypeId: t.option(t.string()),
+  moromiStageLots: t.array(MoromiStageLot),
+  waterProfileId: t.option(t.string()),
+});
 
 // ── Water profile tables ──────────────────────────────────────────────────────
 
@@ -164,43 +189,6 @@ export const MineralSaltIons = table(
   }
 );
 
-// ── Recipe tables ─────────────────────────────────────────────────────────────
-
-export const Recipes = table(
-  { name: 'recipes', public: true },
-  {
-    id: t.string().primaryKey(),
-    name: t.string(),
-    kojiPresetId: t.string(),
-    motoPresetId: t.string(),
-    moromiPresetId: t.string(),
-    waterProfileId: t.string(),
-    recommendedRiceVariety: t.string().optional(),
-    recommendedPolishPct: t.f64().optional(),
-    createdAt: t.timestamp(),
-    updatedAt: t.timestamp(),
-  }
-);
-
-export const RecipeAmendments = table(
-  {
-    name: 'recipe_amendments',
-    public: true,
-    indexes: [{ accessor: 'byRecipeId', algorithm: 'btree', columns: ['recipeId'] }],
-  },
-  {
-    id: t.string().primaryKey(),
-    recipeId: t.string(),
-    kind: t.string(),
-    /** Fraction of total batch rice mass */
-    fracOfTotalRice: t.f64(),
-    /** Stage at which this amendment is added */
-    addedAtStage: t.string(),
-    /** Display order */
-    ordinal: t.i32(),
-  }
-);
-
 // ── Inventory tables ──────────────────────────────────────────────────────────
 
 export const RiceLots = table(
@@ -240,73 +228,124 @@ export const Yeasts = table(
   }
 );
 
-// ── Plan table ────────────────────────────────────────────────────────────────
+// ── Methods ───────────────────────────────────────────────────────────────────
 
-export const RecipePlans = table(
+/** Reusable process definitions (config + schedule). Replaces KojiPresets + MotoPresets + MoromiPresets. */
+export const Methods = table(
   {
-    name: 'recipe_plans',
-    public: true,
-    indexes: [{ accessor: 'byRecipeId', algorithm: 'btree', columns: ['recipeId'] }],
+    name: 'methods',
+    indexes: [{ accessor: 'byOwnerId', algorithm: 'btree', columns: ['ownerId'] }],
+  },
+  {
+    id: t.string().primaryKey(),
+    ownerId: t.string(),
+    kind: MethodKind,
+    name: t.string(),
+    isBuiltIn: t.bool(),
+    body: MethodBody,
+    createdAt: t.timestamp(),
+    updatedAt: t.timestamp(),
+  }
+);
+
+/** Immutable frozen method versions. */
+export const MethodSnapshots = table(
+  {
+    name: 'method_snapshots',
+    indexes: [{ accessor: 'byMethodId', algorithm: 'btree', columns: ['methodId'] }],
+  },
+  {
+    id: t.string().primaryKey(),
+    methodId: t.string(),
+    ownerId: t.string(),
+    kind: MethodKind,
+    version: t.string(),
+    name: t.string(),
+    isPublic: t.bool(),
+    body: MethodBody,
+    createdAt: t.timestamp(),
+  }
+);
+
+// ── Recipes ───────────────────────────────────────────────────────────────────
+
+/** Mutable working copy. References method snapshot IDs, never mutable method IDs. */
+export const Recipes = table(
+  {
+    name: 'recipes',
+    indexes: [{ accessor: 'byOwnerId', algorithm: 'btree', columns: ['ownerId'] }],
+  },
+  {
+    id: t.string().primaryKey(),
+    ownerId: t.string(),
+    name: t.string(),
+    description: t.option(t.string()),
+    kojiMethodSnapshotId: t.string(),
+    motoMethodSnapshotId: t.string(),
+    moromiMethodSnapshotId: t.string(),
+    waterProfileId: t.option(t.string()),
+    amendments: t.array(AmendmentSpec),
+    recommendedRiceVariety: t.option(t.string()),
+    recommendedPolishPct: t.option(t.f64()),
+    recommendedAcidId: t.option(t.string()),
+    recommendedYeastProductId: t.option(t.string()),
+    createdAt: t.timestamp(),
+    updatedAt: t.timestamp(),
+  }
+);
+
+/** Immutable frozen recipe versions. Preserves method snapshot IDs (not embedded bodies). */
+export const RecipeSnapshots = table(
+  {
+    name: 'recipe_snapshots',
+    indexes: [
+      { accessor: 'byRecipeId', algorithm: 'btree', columns: ['recipeId'] },
+      { accessor: 'byOwnerId', algorithm: 'btree', columns: ['ownerId'] },
+    ],
   },
   {
     id: t.string().primaryKey(),
     recipeId: t.string(),
-    /** genshu_volume_L | total_rice_kg */
-    targetKind: t.enum('TargetKind', ['genshu_volume_L', 'total_rice_kg']),
-    targetValue: t.f64(),
-    /** Koji block */
-    kojiRiceLotId: t.string().optional(),
-    kojiStrainId: t.string().optional(),
-    usePremadeKoji: t.bool(),
-    /** Moto block */
-    motoRiceLotId: t.string().optional(),
-    yeastId: t.string().optional(),
-    acidTypeId: t.string().optional(),
-    /** Moromi stage → rice lot mapping */
-    moromiStageLots: t.array(t.object('MoromiStageLot', { stageOrdinal: t.i32(), riceLotId: t.string() })),
-    /** Water profile override (null = use recipe default) */
-    waterProfileId: t.string().optional(),
+    ownerId: t.string(),
+    version: t.string(),
+    name: t.string(),
+    description: t.option(t.string()),
+    isPublic: t.bool(),
+    kojiMethodSnapshotId: t.string(),
+    motoMethodSnapshotId: t.string(),
+    moromiMethodSnapshotId: t.string(),
+    waterProfileId: t.option(t.string()),
+    amendments: t.array(AmendmentSpec),
+    recommendedRiceVariety: t.option(t.string()),
+    recommendedPolishPct: t.option(t.f64()),
+    recommendedAcidId: t.option(t.string()),
+    recommendedYeastProductId: t.option(t.string()),
     createdAt: t.timestamp(),
-    updatedAt: t.timestamp(),
   }
 );
 
-// ── Session tables ────────────────────────────────────────────────────────────
+// ── Batches ───────────────────────────────────────────────────────────────────
 
-export const BrewSessions = table(
+/** Frozen brew instances tied to a recipe snapshot. */
+export const Batches = table(
   {
-    name: 'brew_sessions',
-    public: true,
-    indexes: [{ accessor: 'byPlanId', algorithm: 'btree', columns: ['planId'] }],
+    name: 'batches',
+    indexes: [
+      { accessor: 'byRecipeSnapshotId', algorithm: 'btree', columns: ['recipeSnapshotId'] },
+      { accessor: 'byOwnerId', algorithm: 'btree', columns: ['ownerId'] },
+    ],
   },
   {
     id: t.string().primaryKey(),
-    planId: t.string(),
-    /** planned | in_progress | complete | abandoned */
-    status: t.enum('BrewSessionStatus', ['planned', 'in_progress', 'complete', 'abandoned']),
-    startedAt: t.timestamp().optional(),
-    completedAt: t.timestamp().optional(),
-    notes: t.string().optional(),
+    recipeSnapshotId: t.string(),
+    ownerId: t.string(),
+    status: t.enum('BatchStatus', ['planned', 'in_progress', 'complete', 'abandoned']),
+    body: BatchSelections,
+    startedAt: t.option(t.timestamp()),
+    completedAt: t.option(t.timestamp()),
+    notes: t.option(t.string()),
     createdAt: t.timestamp(),
     updatedAt: t.timestamp(),
-  }
-);
-
-export const BrewCheckpoints = table(
-  {
-    name: 'brew_checkpoints',
-    public: true,
-    indexes: [{ accessor: 'bySessionId', algorithm: 'btree', columns: ['sessionId'] }],
-  },
-  {
-    id: t.string().primaryKey(),
-    sessionId: t.string(),
-    stage: t.string(),
-    stepIndex: t.i32(),
-    stepLabel: t.string(),
-    completed: t.bool(),
-    measuredValue: t.f64().optional(),
-    unit: t.string().optional(),
   }
 );
 
@@ -314,21 +353,20 @@ export const BrewCheckpoints = table(
 
 export default schema({
   User,
-  KojiPresets,
-  MotoPresets,
-  MoromiPresets,
-  MoromiStages,
+  // Catalog / reference (unchanged)
   WaterProfiles,
   WaterProfileIons,
   AcidTypes,
   MineralSalts,
   MineralSaltIons,
-  Recipes,
-  RecipeAmendments,
+  // Inventory (unchanged for 7a)
   RiceLots,
   KojiStrains,
   Yeasts,
-  RecipePlans,
-  BrewSessions,
-  BrewCheckpoints,
+  // New persistence model
+  Methods,
+  MethodSnapshots,
+  Recipes,
+  RecipeSnapshots,
+  Batches,
 });
