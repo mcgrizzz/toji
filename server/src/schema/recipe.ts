@@ -2,13 +2,7 @@ import { table, t } from 'spacetimedb/server';
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
-const DataType = t.enum('DataType', [
-  'recipe',
-  'koji_method',
-  'moto_method',
-  'moromi_method',
-  'water_profile',
-]);
+const DataType = t.enum('DataType', ['recipe', 'process', 'water_profile']);
 
 const EntityKind = t.enum('EntityKind', ['working', 'snapshot']);
 
@@ -18,7 +12,26 @@ const ProvenanceKind = t.enum('ProvenanceKind', [
   'forked',
 ]);
 
-const PlacementKind = t.enum('PlacementKind', ['moto', 'moromi_stage']);
+const ProcessKind = t.enum('ProcessKind', ['koji', 'moto', 'moromi', 'other']);
+
+const MaterialClass = t.enum('MaterialClass', [
+  'rice',
+  'koji',
+  'water',
+  'yeast',
+  'acid',
+  'adjunct',
+  'other',
+]);
+
+const ValueType = t.enum('ValueType', ['number', 'text', 'boolean']);
+
+const QuantityMode = t.enum('QuantityMode', [
+  'absolute',
+  'ratio_of_total_rice',
+  'ratio_of_stage_rice',
+  'ratio_of_target',
+]);
 
 const WorkflowKind = t.enum('WorkflowKind', ['koji', 'moto', 'moromi']);
 
@@ -45,7 +58,7 @@ export const User = table(
 // ── Entity metadata ───────────────────────────────────────────────────────────
 
 /**
- * Shared metadata for all versioned entities (recipes, methods, water profiles).
+ * Shared metadata for all versioned entities (recipes, processes, water profiles).
  * Invariants:
  * - version: null for working, required for snapshot
  * - isPublic: always false for working entities
@@ -82,49 +95,21 @@ export const Entity = table(
 
 // ── Typed payload tables (1:1 with Entity via entityId PK) ────────────────────
 
-/** Recipe data. Method entity IDs must point to snapshot entities, never working. */
 export const Recipe = table(
   { name: 'recipe', public: true },
   {
     entityId: t.string().primaryKey(),
-    kojiMethodEntityId: t.string(),
-    motoMethodEntityId: t.string(),
-    moromiMethodEntityId: t.string(),
-    waterProfileEntityId: t.option(t.string()),
-    recommendedCatalogRiceVarietyId: t.option(t.string()),
-    recommendedPolishPct: t.option(t.f64()),
-    recommendedAcidTypeId: t.option(t.string()),
-    recommendedYeastProductId: t.option(t.string()),
+    defaultWaterProfileEntityId: t.option(t.string()),
+    attachedBatchId: t.option(t.string()),
+    notes: t.option(t.string()),
   }
 );
 
-export const KojiMethod = table(
-  { name: 'koji_method', public: true },
+export const Process = table(
+  { name: 'process', public: true },
   {
     entityId: t.string().primaryKey(),
-    kojiGPerKgRice: t.f64(),
-    carrierName: t.string(),
-    carrierRatioGPerG: t.f64(),
-  }
-);
-
-export const MotoMethod = table(
-  { name: 'moto_method', public: true },
-  {
-    entityId: t.string().primaryKey(),
-    riceFrac: t.f64(),
-    kojiFrac: t.f64(),
-    waterLPerKg: t.f64(),
-    yeastPitchRateMPerMl: t.f64(),
-    acidRefMlPerL: t.f64(),
-    acidRefStrengthPct: t.f64(),
-  }
-);
-
-export const MoromiMethod = table(
-  { name: 'moromi_method', public: true },
-  {
-    entityId: t.string().primaryKey(),
+    processKind: ProcessKind,
     notes: t.option(t.string()),
   }
 );
@@ -137,12 +122,142 @@ export const WaterProfile = table(
   }
 );
 
-// ── Normalized child tables ───────────────────────────────────────────────────
+// ── Process spec tables ─────────────────────────────────────────────────────
 
-/** Amendment on a recipe. stageOrdinal null for moto, required for moromi_stage. */
-export const RecipeAmendment = table(
+export const ProcessParamSpec = table(
   {
-    name: 'recipe_amendment',
+    name: 'process_param_spec',
+    public: true,
+    indexes: [
+      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    processEntityId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    valueType: ValueType,
+    unit: t.option(t.string()),
+    defaultNumberValue: t.option(t.f64()),
+    defaultTextValue: t.option(t.string()),
+    defaultBoolValue: t.option(t.bool()),
+    notes: t.option(t.string()),
+  }
+);
+
+export const ProcessStageSpec = table(
+  {
+    name: 'process_stage_spec',
+    public: true,
+    indexes: [
+      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    processEntityId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    materialOrdinal: t.option(t.i32()),
+    notes: t.option(t.string()),
+  }
+);
+
+export const ProcessSubstageSpec = table(
+  {
+    name: 'process_substage_spec',
+    public: true,
+    indexes: [
+      { accessor: 'byStageSpecId', algorithm: 'btree' as const, columns: ['stageSpecId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    stageSpecId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    notes: t.option(t.string()),
+  }
+);
+
+export const ProcessMaterialSlotSpec = table(
+  {
+    name: 'process_material_slot_spec',
+    public: true,
+    indexes: [
+      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    processEntityId: t.string(),
+    stageSpecId: t.option(t.string()),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    materialClass: MaterialClass,
+    quantityMode: QuantityMode,
+    quantityValue: t.option(t.f64()),
+    quantityUnit: t.option(t.string()),
+    notes: t.option(t.string()),
+  }
+);
+
+export const ProcessStepSpec = table(
+  {
+    name: 'process_step_spec',
+    public: true,
+    indexes: [
+      { accessor: 'bySubstageSpecId', algorithm: 'btree' as const, columns: ['substageSpecId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    substageSpecId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    instructionTemplate: t.string(),
+    isCheckable: t.bool(),
+    scheduledOffsetH: t.option(t.f64()),
+    durationH: t.option(t.f64()),
+    notes: t.option(t.string()),
+  }
+);
+
+export const ProcessStepFieldSpec = table(
+  {
+    name: 'process_step_field_spec',
+    public: true,
+    indexes: [
+      { accessor: 'byStepSpecId', algorithm: 'btree' as const, columns: ['stepSpecId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    stepSpecId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    valueType: ValueType,
+    unit: t.option(t.string()),
+    defaultNumberValue: t.option(t.f64()),
+    defaultTextValue: t.option(t.string()),
+    defaultBoolValue: t.option(t.bool()),
+    captureActualOnComplete: t.bool(),
+    notes: t.option(t.string()),
+  }
+);
+
+// ── Recipe composition tables ───────────────────────────────────────────────
+
+export const RecipeProcessUse = table(
+  {
+    name: 'recipe_process_use',
     public: true,
     indexes: [
       { accessor: 'byRecipeEntityId', algorithm: 'btree' as const, columns: ['recipeEntityId'] },
@@ -152,31 +267,54 @@ export const RecipeAmendment = table(
     id: t.string().primaryKey(),
     recipeEntityId: t.string(),
     ordinal: t.i32(),
-    kind: t.string(),
-    fracOfTotalRice: t.f64(),
-    placementKind: PlacementKind,
-    stageOrdinal: t.option(t.i32()),
+    label: t.string(),
+    processSnapshotEntityId: t.string(),
+    notes: t.option(t.string()),
   }
 );
 
-export const MoromiStage = table(
+export const RecipeMaterialSpec = table(
   {
-    name: 'moromi_stage',
+    name: 'recipe_material_spec',
     public: true,
     indexes: [
-      { accessor: 'byMoromiMethodEntityId', algorithm: 'btree' as const, columns: ['moromiMethodEntityId'] },
+      { accessor: 'byRecipeEntityId', algorithm: 'btree' as const, columns: ['recipeEntityId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    moromiMethodEntityId: t.string(),
-    ordinal: t.i32(),
-    name: t.string(),
-    riceFrac: t.f64(),
-    kojiFrac: t.f64(),
-    waterLPerKg: t.f64(),
+    recipeEntityId: t.string(),
+    key: t.string(),
+    label: t.string(),
+    materialClass: MaterialClass,
+    defaultUnit: t.string(),
+    catalogRefType: t.option(t.string()),
+    catalogRefId: t.option(t.string()),
+    customName: t.option(t.string()),
+    notes: t.option(t.string()),
   }
 );
+
+export const RecipeProcessMaterialBinding = table(
+  {
+    name: 'recipe_process_material_binding',
+    public: true,
+    indexes: [
+      { accessor: 'byRecipeProcessUseId', algorithm: 'btree' as const, columns: ['recipeProcessUseId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    recipeProcessUseId: t.string(),
+    processMaterialSlotSpecId: t.string(),
+    recipeMaterialSpecId: t.string(),
+    quantityOverride: t.option(t.f64()),
+    quantityUnitOverride: t.option(t.string()),
+    notes: t.option(t.string()),
+  }
+);
+
+// ── Normalized child tables ───────────────────────────────────────────────────
 
 export const WaterProfileIon = table(
   {
@@ -196,22 +334,24 @@ export const WaterProfileIon = table(
 
 // ── Schedule tables ───────────────────────────────────────────────────────────
 
+// TODO: Migrate schedule to reference ProcessStageSpec/ProcessStepSpec directly
 export const ScheduleTable = table(
   {
     name: 'schedule',
     public: true,
     indexes: [
-      { accessor: 'byMethodEntityId', algorithm: 'btree' as const, columns: ['methodEntityId'] },
+      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    methodEntityId: t.string(),
+    processEntityId: t.string(),
     workflowKind: WorkflowKind,
     name: t.string(),
   }
 );
 
+// TODO: Migrate schedule events to reference ProcessStageSpec ordinals
 /**
  * For absolute: use hoursFromStart; stageOrdinal/offsetHours null.
  * For relative_to_stage: use stageOrdinal+offsetHours; hoursFromStart null.
