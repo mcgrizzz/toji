@@ -1,15 +1,15 @@
 <script lang="ts">
 	import type { RecipeBundle } from '$lib/app/types';
 	import type { RecipePlanDraft } from '$lib/engine/models/planTypes';
-	import { riceLots, kojiStrains, yeastStocks } from '$lib/data/inventory';
-	import { riceLotToRef, kojiStrainToRef, yeastStockToRef } from '$lib/app/adapters/inventoryToRefs';
+	import type { Inventory } from '$lib/services/inventoryService';
 
 	type Props = {
 		bundle: RecipeBundle;
+		inventory: Inventory;
 		onpreview: (plan: RecipePlanDraft) => void;
 	};
 
-	let { bundle, onpreview }: Props = $props();
+	let { bundle, inventory, onpreview }: Props = $props();
 
 	// ── Form state ──────────────────────────────────────────────────────────
 	let targetKind = $state<'genshu_volume_L' | 'total_rice_kg'>(
@@ -18,29 +18,33 @@
 	let targetValue = $state(bundle.defaults.targetValue ?? 6.7);
 	let premadeKoji = $state(false);
 
-	// Inventory selections (ID-based)
-	let selectedKojiRiceLotId = $state(riceLots[0]?.id ?? '');
-	let selectedMainRiceLotId = $state(riceLots[0]?.id ?? '');
-	let selectedKojiStrainId = $state(kojiStrains[0]?.id ?? '');
-	let selectedYeastStockId = $state(yeastStocks[0]?.id ?? '');
+	// Inventory selections (ID-based, using ref shapes)
+	let selectedKojiRiceLotId = $state(inventory.riceLots[0]?.lotId ?? '');
+	let selectedMainRiceLotId = $state(inventory.riceLots[0]?.lotId ?? '');
+	let selectedKojiStrainId = $state(inventory.kojiStrains[0]?.strainId ?? '');
+	let selectedYeastId = $state(inventory.yeasts[0]?.yeastId ?? '');
 
 	// Derived lookups
-	let selectedKojiRiceLot = $derived(riceLots.find((l) => l.id === selectedKojiRiceLotId));
-	let selectedMainRiceLot = $derived(riceLots.find((l) => l.id === selectedMainRiceLotId));
-	let selectedKojiStrain = $derived(kojiStrains.find((s) => s.id === selectedKojiStrainId));
-	let selectedYeastStock = $derived(yeastStocks.find((y) => y.id === selectedYeastStockId));
+	let selectedKojiRiceLot = $derived(
+		inventory.riceLots.find((l) => l.lotId === selectedKojiRiceLotId)
+	);
+	let selectedMainRiceLot = $derived(
+		inventory.riceLots.find((l) => l.lotId === selectedMainRiceLotId)
+	);
+	let selectedKojiStrain = $derived(
+		inventory.kojiStrains.find((s) => s.strainId === selectedKojiStrainId)
+	);
+	let selectedYeast = $derived(inventory.yeasts.find((y) => y.yeastId === selectedYeastId));
 
 	let canSubmit = $derived(
 		selectedMainRiceLot != null &&
-			selectedYeastStock != null &&
+			selectedYeast != null &&
 			(premadeKoji || (selectedKojiRiceLot != null && selectedKojiStrain != null))
 	);
 
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
 		if (!canSubmit) return;
-
-		const kakeLotRef = riceLotToRef(selectedMainRiceLot!);
 
 		const plan: RecipePlanDraft = {
 			recipeId: bundle.id,
@@ -49,18 +53,18 @@
 				? { mode: 'premade' }
 				: {
 						mode: 'make',
-						riceLot: riceLotToRef(selectedKojiRiceLot!),
-						kojiStrain: kojiStrainToRef(selectedKojiStrain!)
+						riceLot: selectedKojiRiceLot!,
+						kojiStrain: selectedKojiStrain!
 					},
 			moto: {
-				riceLot: kakeLotRef,
-				yeast: yeastStockToRef(selectedYeastStock!),
+				riceLot: selectedMainRiceLot!,
+				yeast: selectedYeast!,
 				acid: bundle.defaultAcid
 			},
 			moromi: {
 				stages: bundle.presets.moromiPreset.stages.map((s) => ({
 					stageOrdinal: s.ordinal,
-					riceLot: kakeLotRef
+					riceLot: selectedMainRiceLot!
 				}))
 			},
 			water: bundle.presets.waterProfile
@@ -73,10 +77,7 @@
 		'w-full rounded border bg-background px-2 py-1 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 </script>
 
-<form
-	onsubmit={submit}
-	class="space-y-4 rounded-lg border bg-background p-4"
->
+<form onsubmit={submit} class="space-y-4 rounded-lg border bg-background p-4">
 	<h2 class="text-sm font-semibold">Plan Settings</h2>
 
 	<!-- Target -->
@@ -127,9 +128,10 @@
 			<label class="block">
 				<span class="sr-only">Koji rice lot</span>
 				<select bind:value={selectedKojiRiceLotId} class={selectClass}>
-					{#each riceLots as lot (lot.id)}
-						<option value={lot.id}>
-							{lot.variety} {lot.polishPct}%{lot.lotLabel ? ` (${lot.lotLabel})` : ''}
+					{#each inventory.riceLots as lot (lot.lotId)}
+						<option value={lot.lotId}>
+							{lot.variety}
+							{lot.polishPct}%{lot.lotLabel ? ` (${lot.lotLabel})` : ''}
 						</option>
 					{/each}
 				</select>
@@ -141,8 +143,8 @@
 			<label class="block">
 				<span class="sr-only">Koji strain</span>
 				<select bind:value={selectedKojiStrainId} class={selectClass}>
-					{#each kojiStrains as strain (strain.id)}
-						<option value={strain.id}>{strain.name}</option>
+					{#each inventory.kojiStrains as strain (strain.strainId)}
+						<option value={strain.strainId}>{strain.name}</option>
 					{/each}
 				</select>
 			</label>
@@ -155,9 +157,10 @@
 		<label class="block">
 			<span class="sr-only">Main rice lot</span>
 			<select bind:value={selectedMainRiceLotId} class={selectClass}>
-				{#each riceLots as lot (lot.id)}
-					<option value={lot.id}>
-						{lot.variety} {lot.polishPct}%{lot.lotLabel ? ` (${lot.lotLabel})` : ''}
+				{#each inventory.riceLots as lot (lot.lotId)}
+					<option value={lot.lotId}>
+						{lot.variety}
+						{lot.polishPct}%{lot.lotLabel ? ` (${lot.lotLabel})` : ''}
 					</option>
 				{/each}
 			</select>
@@ -168,10 +171,10 @@
 	<fieldset class="space-y-2">
 		<legend class="text-xs font-semibold text-muted-foreground">Yeast</legend>
 		<label class="block">
-			<span class="sr-only">Yeast stock</span>
-			<select bind:value={selectedYeastStockId} class={selectClass}>
-				{#each yeastStocks as stock (stock.id)}
-					<option value={stock.id}>{stock.name} ({stock.format})</option>
+			<span class="sr-only">Yeast</span>
+			<select bind:value={selectedYeastId} class={selectClass}>
+				{#each inventory.yeasts as yeast (yeast.yeastId)}
+					<option value={yeast.yeastId}>{yeast.name} ({yeast.format})</option>
 				{/each}
 			</select>
 		</label>

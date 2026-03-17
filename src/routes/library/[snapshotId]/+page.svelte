@@ -1,29 +1,50 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { getRecipeSnapshotById } from '$lib/data/library';
-	import { resolveBundleFromSource } from '$lib/data/lookups';
-	import { createRecipeFromSnapshot } from '$lib/app/adapters/copySnapshotToRecipe';
-	import { addRecipe } from '$lib/data/recipes/recipeStore.svelte';
+	import { getRecipeBundle } from '$lib/services/libraryService';
+	import { copyRecipeSnapshotToRecipe } from '$lib/services/recipeService';
+	import type { RecipeBundle } from '$lib/app/types';
 
-	const snapshot = $derived(
-		$page.params.snapshotId ? getRecipeSnapshotById($page.params.snapshotId) : null
-	);
+	let bundle = $state<RecipeBundle | null>(null);
+	let loading = $state(true);
+	let error = $state('');
+	let copying = $state(false);
 
-	const bundle = $derived(snapshot ? resolveBundleFromSource(snapshot) : null);
+	$effect(() => {
+		const snapshotId = $page.params.snapshotId;
+		if (!snapshotId) return;
+		loading = true;
+		error = '';
+		bundle = null;
 
-	function copyToMyRecipes() {
-		if (!snapshot) return;
-		const recipe = createRecipeFromSnapshot(snapshot.id);
-		if (!recipe) return;
-		addRecipe(recipe);
-		goto('/recipes');
+		getRecipeBundle(snapshotId)
+			.then((b) => (bundle = b))
+			.catch((e) => (error = e instanceof Error ? e.message : String(e)))
+			.finally(() => (loading = false));
+	});
+
+	async function copyToMyRecipes() {
+		const snapshotId = $page.params.snapshotId;
+		if (!snapshotId || copying) return;
+		copying = true;
+		try {
+			await copyRecipeSnapshotToRecipe(snapshotId);
+			goto('/recipes');
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			copying = false;
+		}
 	}
 </script>
 
-{#if !snapshot || !bundle}
+{#if loading}
 	<main class="mx-auto max-w-3xl p-4">
-		<p class="text-destructive">Snapshot not found.</p>
+		<p class="text-sm text-muted-foreground">Loading...</p>
+	</main>
+{:else if error || !bundle}
+	<main class="mx-auto max-w-3xl p-4">
+		<p class="text-destructive">{error || 'Snapshot not found.'}</p>
 		<a href="/library" class="text-sm text-primary hover:underline">&larr; Library</a>
 	</main>
 {:else}
@@ -48,7 +69,9 @@
 		{#if bundle.presets.waterProfile}
 			<section class="space-y-3">
 				<h2 class="text-sm font-medium text-muted-foreground">Water Profile</h2>
-				<span class="rounded-sm bg-muted px-2 py-0.5 text-xs">{bundle.presets.waterProfile.name}</span>
+				<span class="rounded-sm bg-muted px-2 py-0.5 text-xs"
+					>{bundle.presets.waterProfile.name}</span
+				>
 			</section>
 		{/if}
 
@@ -57,7 +80,11 @@
 				<h2 class="text-sm font-medium text-muted-foreground">Amendments</h2>
 				<ul class="space-y-1 text-sm">
 					{#each bundle.template.amendments as amendment}
-						<li class="text-muted-foreground">{amendment.kind} — {amendment.placement}</li>
+						<li class="text-muted-foreground">
+							{amendment.kind} — {amendment.placement.where}{amendment.placement.where === 'moromi' && 'stageOrdinal' in amendment.placement
+								? ` (stage ${amendment.placement.stageOrdinal})`
+								: ''}
+						</li>
 					{/each}
 				</ul>
 			</section>
@@ -80,9 +107,10 @@
 		<button
 			type="button"
 			onclick={copyToMyRecipes}
-			class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+			disabled={copying}
+			class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50 disabled:pointer-events-none"
 		>
-			Copy to My Recipes
+			{copying ? 'Copying...' : 'Copy to My Recipes'}
 		</button>
 	</main>
 {/if}

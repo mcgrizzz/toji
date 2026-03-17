@@ -12,7 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-"stdb:generate": "spacetime generate --lang typescript --out-dir ./src/lib/spacetimedb/module_bindings --module-path ./server",
+		"stdb:generate": "spacetime generate --lang typescript --out-dir ./src/lib/spacetimedb/module_bindings --module-path ./server",
 		"stdb:publish": "spacetime publish toji --server local --module-path ./server"
 	},
 	"devDependencies": {
@@ -29,7 +29,7 @@
 		"@types/node": "^22",
 		"bits-ui": "^2.15.4",
 		"clsx": "^2.1.1",
-"eslint": "^9.39.1",
+		"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.13.1",
 		"globals": "^16.5.0",
@@ -46,5 +46,7 @@
 		"typescript-eslint": "^8.48.1",
 		"vite": "^7.2.6"
 	},
-	"dependencies": {}
+	"dependencies": {
+		"spacetimedb": "^2.0.4"
+	}
 }
