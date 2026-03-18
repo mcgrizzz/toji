@@ -1,7 +1,6 @@
 import type {
 	ProcessKind,
 	ProcessStageSpec,
-	ProcessSubstageSpec,
 	ProcessMaterialSlotSpec,
 	ProcessStepSpec,
 	ProcessStepFieldSpec,
@@ -23,23 +22,6 @@ const kojiStages: ProcessStageSpec[] = [
 		ordinal: 0,
 		key: 'seikiku',
 		label: 'Seikiku'
-	}
-];
-
-const kojiSubstages: ProcessSubstageSpec[] = [
-	{
-		id: 'kss-1',
-		stageSpecId: 'ks-1',
-		ordinal: 0,
-		key: 'inoculation',
-		label: 'Inoculation'
-	},
-	{
-		id: 'kss-2',
-		stageSpecId: 'ks-1',
-		ordinal: 1,
-		key: 'incubation',
-		label: 'Incubation'
 	}
 ];
 
@@ -73,23 +55,27 @@ const kojiMaterials: ProcessMaterialSlotSpec[] = [
 const kojiSteps: ProcessStepSpec[] = [
 	{
 		id: 'kst-1',
-		substageSpecId: 'kss-1',
+		stageSpecId: 'ks-1',
 		ordinal: 0,
 		key: 'sprinkle',
 		label: 'Sprinkle spores',
 		instructionTemplate: 'Sprinkle {tane-koji} onto steamed rice.',
 		isCheckable: true,
+		sectionKey: 'inoculation',
+		sectionLabel: 'Inoculation',
 		scheduledOffsetH: 0,
 		durationH: 0.5
 	},
 	{
 		id: 'kst-2',
-		substageSpecId: 'kss-2',
-		ordinal: 0,
+		stageSpecId: 'ks-1',
+		ordinal: 1,
 		key: 'check-temp',
 		label: 'Check temperature',
 		instructionTemplate: 'Measure bed temperature.',
 		isCheckable: true,
+		sectionKey: 'incubation',
+		sectionLabel: 'Incubation',
 		scheduledOffsetH: 12,
 		durationH: 0.25
 	}
@@ -114,7 +100,6 @@ const kojiSnapshot: ProcessSnapshot = {
 	processKind: 'koji',
 	name: 'Koji (fixture)',
 	stages: kojiStages,
-	substages: kojiSubstages,
 	materialSlots: kojiMaterials,
 	steps: kojiSteps,
 	stepFields: kojiStepFields
@@ -129,16 +114,6 @@ const motoStages: ProcessStageSpec[] = [
 		ordinal: 0,
 		key: 'buildup',
 		label: 'Buildup'
-	}
-];
-
-const motoSubstages: ProcessSubstageSpec[] = [
-	{
-		id: 'mss-1',
-		stageSpecId: 'ms-1',
-		ordinal: 0,
-		key: 'mix',
-		label: 'Mixing'
 	}
 ];
 
@@ -160,12 +135,14 @@ const motoMaterials: ProcessMaterialSlotSpec[] = [
 const motoSteps: ProcessStepSpec[] = [
 	{
 		id: 'mst-1',
-		substageSpecId: 'mss-1',
+		stageSpecId: 'ms-1',
 		ordinal: 0,
 		key: 'combine',
 		label: 'Combine ingredients',
 		instructionTemplate: 'Add water, koji, and yeast.',
 		isCheckable: true,
+		sectionKey: 'mix',
+		sectionLabel: 'Mixing',
 		scheduledOffsetH: 0
 	}
 ];
@@ -187,7 +164,6 @@ const motoSnapshot: ProcessSnapshot = {
 	processKind: 'moto',
 	name: 'Moto (fixture)',
 	stages: motoStages,
-	substages: motoSubstages,
 	materialSlots: motoMaterials,
 	steps: motoSteps,
 	stepFields: motoStepFields
@@ -212,23 +188,6 @@ const moromiStages: ProcessStageSpec[] = [
 	}
 ];
 
-const moromiSubstages: ProcessSubstageSpec[] = [
-	{
-		id: 'rss-1',
-		stageSpecId: 'rs-1',
-		ordinal: 0,
-		key: 'addition',
-		label: 'Addition'
-	},
-	{
-		id: 'rss-2',
-		stageSpecId: 'rs-2',
-		ordinal: 0,
-		key: 'addition',
-		label: 'Addition'
-	}
-];
-
 const moromiMaterials: ProcessMaterialSlotSpec[] = [
 	{
 		id: 'rm-1',
@@ -247,23 +206,27 @@ const moromiMaterials: ProcessMaterialSlotSpec[] = [
 const moromiSteps: ProcessStepSpec[] = [
 	{
 		id: 'rst-1',
-		substageSpecId: 'rss-1',
+		stageSpecId: 'rs-1',
 		ordinal: 0,
 		key: 'add-rice',
 		label: 'Add steamed rice',
 		instructionTemplate: 'Add steamed rice to the mash.',
 		isCheckable: true,
+		sectionKey: 'addition',
+		sectionLabel: 'Addition',
 		scheduledOffsetH: 0,
 		durationH: 1
 	},
 	{
 		id: 'rst-2',
-		substageSpecId: 'rss-2',
+		stageSpecId: 'rs-2',
 		ordinal: 0,
 		key: 'add-rice',
 		label: 'Add steamed rice',
 		instructionTemplate: 'Add steamed rice to the mash.',
 		isCheckable: false,
+		sectionKey: 'addition',
+		sectionLabel: 'Addition',
 		scheduledOffsetH: 48,
 		durationH: 1
 	}
@@ -298,7 +261,6 @@ const moromiSnapshot: ProcessSnapshot = {
 	processKind: 'moromi',
 	name: 'Moromi (fixture)',
 	stages: moromiStages,
-	substages: moromiSubstages,
 	materialSlots: moromiMaterials,
 	steps: moromiSteps,
 	stepFields: moromiStepFields

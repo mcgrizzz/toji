@@ -12,16 +12,6 @@ export type ProcessStageSpec = {
 	notes?: string;
 };
 
-/** Client-side mirror of server ProcessSubstageSpec table. */
-export type ProcessSubstageSpec = {
-	id: string;
-	stageSpecId: string;
-	ordinal: number;
-	key: string;
-	label: string;
-	notes?: string;
-};
-
 /** Client-side mirror of server ProcessMaterialSlotSpec table. */
 export type ProcessMaterialSlotSpec = {
 	id: string;
@@ -40,12 +30,14 @@ export type ProcessMaterialSlotSpec = {
 /** Client-side mirror of server ProcessStepSpec table. */
 export type ProcessStepSpec = {
 	id: string;
-	substageSpecId: string;
+	stageSpecId: string;
 	ordinal: number;
 	key: string;
 	label: string;
 	instructionTemplate: string;
 	isCheckable: boolean;
+	sectionKey?: string;
+	sectionLabel?: string;
 	scheduledOffsetH?: number;
 	durationH?: number;
 	notes?: string;
@@ -73,7 +65,6 @@ export type ProcessSnapshot = {
 	processKind: ProcessKind;
 	name: string;
 	stages: ProcessStageSpec[];
-	substages: ProcessSubstageSpec[];
 	materialSlots: ProcessMaterialSlotSpec[];
 	steps: ProcessStepSpec[];
 	stepFields: ProcessStepFieldSpec[];

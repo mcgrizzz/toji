@@ -83,9 +83,9 @@ export const BatchStageInstance = table(
   }
 );
 
-export const BatchSubstageInstance = table(
+export const BatchStepInstance = table(
   {
-    name: 'batch_substage_instance',
+    name: 'batch_step_instance',
     public: true,
     indexes: [
       { accessor: 'byBatchStageInstanceId', algorithm: 'btree' as const, columns: ['batchStageInstanceId'] },
@@ -94,27 +94,12 @@ export const BatchSubstageInstance = table(
   {
     id: t.string().primaryKey(),
     batchStageInstanceId: t.string(),
-    substageSpecId: t.string(),
-    ordinal: t.i32(),
-    label: t.string(),
-  }
-);
-
-export const BatchStepInstance = table(
-  {
-    name: 'batch_step_instance',
-    public: true,
-    indexes: [
-      { accessor: 'byBatchSubstageInstanceId', algorithm: 'btree' as const, columns: ['batchSubstageInstanceId'] },
-    ],
-  },
-  {
-    id: t.string().primaryKey(),
-    batchSubstageInstanceId: t.string(),
     stepSpecId: t.string(),
     ordinal: t.i32(),
     label: t.string(),
     renderedInstruction: t.string(),
+    sectionKey: t.option(t.string()),
+    sectionLabel: t.option(t.string()),
     status: BatchStatus,
     dueAt: t.option(t.timestamp()),
     completedAt: t.option(t.timestamp()),

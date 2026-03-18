@@ -65,13 +65,8 @@ function loadRecipeMaterialBindings(tx: any, rpuId: string) {
   return [...tx.db.RecipeProcessMaterialBinding.byRecipeProcessUseId.filter(rpuId)];
 }
 
-function loadProcessSubstages(tx: any, stageSpecId: string) {
-  return [...tx.db.ProcessSubstageSpec.byStageSpecId.filter(stageSpecId)]
-    .sort((a: any, b: any) => a.ordinal - b.ordinal);
-}
-
-function loadProcessSteps(tx: any, substageSpecId: string) {
-  return [...tx.db.ProcessStepSpec.bySubstageSpecId.filter(substageSpecId)]
+function loadProcessSteps(tx: any, stageSpecId: string) {
+  return [...tx.db.ProcessStepSpec.byStageSpecId.filter(stageSpecId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 }
 
@@ -684,54 +679,42 @@ export const createBatch = spacetimedb.procedure(
           kindStageMap.set(stage.materialOrdinal, bsiId);
         }
 
-        // Substages
-        const substages = loadProcessSubstages(tx, stage.id);
-        for (const substage of substages) {
-          const bssiId = tx.newUuidV4().toString();
+        // Steps (directly under stage)
+        const steps = loadProcessSteps(tx, stage.id);
+        for (const step of steps) {
+          const bstepId = tx.newUuidV4().toString();
 
-          tx.db.BatchSubstageInstance.insert({
-            id: bssiId,
+          tx.db.BatchStepInstance.insert({
+            id: bstepId,
             batchStageInstanceId: bsiId,
-            substageSpecId: substage.id,
-            ordinal: substage.ordinal,
-            label: substage.label,
+            stepSpecId: step.id,
+            ordinal: step.ordinal,
+            label: step.label,
+            renderedInstruction: step.instructionTemplate,
+            sectionKey: step.sectionKey,
+            sectionLabel: step.sectionLabel,
+            status: { tag: 'planned' },
+            dueAt: undefined,
+            completedAt: undefined,
+            notes: undefined,
           });
 
-          // Steps
-          const steps = loadProcessSteps(tx, substage.id);
-          for (const step of steps) {
-            const bstepId = tx.newUuidV4().toString();
-
-            tx.db.BatchStepInstance.insert({
-              id: bstepId,
-              batchSubstageInstanceId: bssiId,
-              stepSpecId: step.id,
-              ordinal: step.ordinal,
-              label: step.label,
-              renderedInstruction: step.instructionTemplate,
-              status: { tag: 'planned' },
-              dueAt: undefined,
-              completedAt: undefined,
-              notes: undefined,
+          // Step fields
+          const fields = loadProcessStepFields(tx, step.id);
+          for (const field of fields) {
+            tx.db.BatchStepFieldValue.insert({
+              id: tx.newUuidV4().toString(),
+              batchStepInstanceId: bstepId,
+              stepFieldSpecId: field.id,
+              key: field.key,
+              plannedNumber: field.defaultNumberValue,
+              plannedText: field.defaultTextValue,
+              plannedBool: field.defaultBoolValue,
+              actualNumber: undefined,
+              actualText: undefined,
+              actualBool: undefined,
+              actualLoggedAt: undefined,
             });
-
-            // Step fields
-            const fields = loadProcessStepFields(tx, step.id);
-            for (const field of fields) {
-              tx.db.BatchStepFieldValue.insert({
-                id: tx.newUuidV4().toString(),
-                batchStepInstanceId: bstepId,
-                stepFieldSpecId: field.id,
-                key: field.key,
-                plannedNumber: field.defaultNumberValue,
-                plannedText: field.defaultTextValue,
-                plannedBool: field.defaultBoolValue,
-                actualNumber: undefined,
-                actualText: undefined,
-                actualBool: undefined,
-                actualLoggedAt: undefined,
-              });
-            }
           }
         }
       }

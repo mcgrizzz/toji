@@ -24,21 +24,15 @@
 		return [...snapshot.stages].sort((a, b) => a.ordinal - b.ordinal);
 	}
 
-	function substagesToStage(stageId: string) {
-		return selectedSnapshot.substages
-			.filter((ss) => ss.stageSpecId === stageId)
-			.sort((a, b) => a.ordinal - b.ordinal);
-	}
-
 	function materialsForStage(stageId: string) {
 		return selectedSnapshot.materialSlots
 			.filter((m) => m.stageSpecId === stageId)
 			.sort((a, b) => a.ordinal - b.ordinal);
 	}
 
-	function stepsForSubstage(substageId: string) {
+	function stepsForStage(stageId: string) {
 		return selectedSnapshot.steps
-			.filter((s) => s.substageSpecId === substageId)
+			.filter((s) => s.stageSpecId === stageId)
 			.sort((a, b) => a.ordinal - b.ordinal);
 	}
 
@@ -175,76 +169,73 @@
 					</div>
 				{/if}
 
-				<!-- Substages -->
-				{#each substagesToStage(stage.id) as substage}
-					<div class="mt-4 ml-2">
-						<h4 class="text-xs font-semibold">
-							Substage {substage.ordinal}: {substage.label}
-							<span class="text-muted-foreground ml-1 font-normal">key={substage.key}</span>
-							<span class="text-muted-foreground ml-1 text-[10px] opacity-60"
-								>id={substage.id}</span
-							>
-						</h4>
+				<!-- Steps (grouped by section) -->
+				{#each stepsForStage(stage.id) as step, i}
+					{@const prevStep = i > 0 ? stepsForStage(stage.id)[i - 1] : null}
+					{#if step.sectionLabel && step.sectionKey !== prevStep?.sectionKey}
+						<div class="mt-4 ml-2">
+							<h4 class="text-xs font-semibold">
+								{step.sectionLabel}
+								<span class="text-muted-foreground ml-1 font-normal">key={step.sectionKey}</span>
+							</h4>
+						</div>
+					{/if}
 
-						<!-- Steps -->
-						{#each stepsForSubstage(substage.id) as step}
-							<div class="bg-muted/20 mt-2 ml-4 rounded-md border p-3">
-								<div class="flex items-baseline justify-between">
-									<div class="text-xs font-semibold">
-										Step {step.ordinal}: {step.label}
-									</div>
-									<span class="text-muted-foreground text-[10px] opacity-60"
-										>id={step.id}</span
-									>
-								</div>
-								<div class="text-muted-foreground mt-1 text-xs">
-									{step.instructionTemplate}
-								</div>
-								<div class="text-muted-foreground mt-0.5 flex gap-2 text-xs">
-									<span>checkable: {step.isCheckable}</span>
-									{#if step.scheduledOffsetH !== undefined}
-										<span>&middot; offset: {step.scheduledOffsetH}h</span>
-									{/if}
-									{#if step.durationH !== undefined}
-										<span>&middot; duration: {step.durationH}h</span>
-									{/if}
-								</div>
-
-								<!-- Fields -->
-								{#if fieldsForStep(step.id).length > 0}
-									<div class="mt-2">
-										<span
-											class="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider"
-											>Fields</span
-										>
-										<div class="mt-1 space-y-1">
-											{#each fieldsForStep(step.id) as field}
-												<div class="flex flex-wrap items-center gap-1.5 text-xs">
-													<span class="text-muted-foreground">{field.ordinal}.</span>
-													<span class="font-medium">{field.label}</span>
-													<code
-														class="bg-muted rounded px-1 py-0.5 text-[10px] leading-none"
-														>{field.valueType}</code
-													>
-													{#if field.unit}
-														<span class="text-muted-foreground">unit={field.unit}</span>
-													{/if}
-													<span class="text-muted-foreground"
-														>default={defaultDisplay(field)}</span
-													>
-													{#if field.captureActualOnComplete}
-														<span
-															class="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] leading-none text-blue-600 dark:text-blue-400"
-															>capture</span
-														>
-													{/if}
-												</div>
-											{/each}
-										</div>
-									</div>
-								{/if}
+					<div class="bg-muted/20 mt-2 rounded-md border p-3 {step.sectionKey ? 'ml-6' : 'ml-2'}">
+						<div class="flex items-baseline justify-between">
+							<div class="text-xs font-semibold">
+								Step {step.ordinal}: {step.label}
 							</div>
-						{/each}
+							<span class="text-muted-foreground text-[10px] opacity-60"
+								>id={step.id}</span
+							>
+						</div>
+						<div class="text-muted-foreground mt-1 text-xs">
+							{step.instructionTemplate}
+						</div>
+						<div class="text-muted-foreground mt-0.5 flex gap-2 text-xs">
+							<span>checkable: {step.isCheckable}</span>
+							{#if step.scheduledOffsetH !== undefined}
+								<span>&middot; offset: {step.scheduledOffsetH}h</span>
+							{/if}
+							{#if step.durationH !== undefined}
+								<span>&middot; duration: {step.durationH}h</span>
+							{/if}
+						</div>
+
+						<!-- Fields -->
+						{#if fieldsForStep(step.id).length > 0}
+							<div class="mt-2">
+								<span
+									class="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider"
+									>Fields</span
+								>
+								<div class="mt-1 space-y-1">
+									{#each fieldsForStep(step.id) as field}
+										<div class="flex flex-wrap items-center gap-1.5 text-xs">
+											<span class="text-muted-foreground">{field.ordinal}.</span>
+											<span class="font-medium">{field.label}</span>
+											<code
+												class="bg-muted rounded px-1 py-0.5 text-[10px] leading-none"
+												>{field.valueType}</code
+											>
+											{#if field.unit}
+												<span class="text-muted-foreground">unit={field.unit}</span>
+											{/if}
+											<span class="text-muted-foreground"
+												>default={defaultDisplay(field)}</span
+											>
+											{#if field.captureActualOnComplete}
+												<span
+													class="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] leading-none text-blue-600 dark:text-blue-400"
+													>capture</span
+												>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>

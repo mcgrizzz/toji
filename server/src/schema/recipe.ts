@@ -166,24 +166,6 @@ export const ProcessStageSpec = table(
   }
 );
 
-export const ProcessSubstageSpec = table(
-  {
-    name: 'process_substage_spec',
-    public: true,
-    indexes: [
-      { accessor: 'byStageSpecId', algorithm: 'btree' as const, columns: ['stageSpecId'] },
-    ],
-  },
-  {
-    id: t.string().primaryKey(),
-    stageSpecId: t.string(),
-    ordinal: t.i32(),
-    key: t.string(),
-    label: t.string(),
-    notes: t.option(t.string()),
-  }
-);
-
 export const ProcessMaterialSlotSpec = table(
   {
     name: 'process_material_slot_spec',
@@ -212,17 +194,19 @@ export const ProcessStepSpec = table(
     name: 'process_step_spec',
     public: true,
     indexes: [
-      { accessor: 'bySubstageSpecId', algorithm: 'btree' as const, columns: ['substageSpecId'] },
+      { accessor: 'byStageSpecId', algorithm: 'btree' as const, columns: ['stageSpecId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    substageSpecId: t.string(),
+    stageSpecId: t.string(),
     ordinal: t.i32(),
     key: t.string(),
     label: t.string(),
     instructionTemplate: t.string(),
     isCheckable: t.bool(),
+    sectionKey: t.option(t.string()),
+    sectionLabel: t.option(t.string()),
     scheduledOffsetH: t.option(t.f64()),
     durationH: t.option(t.f64()),
     notes: t.option(t.string()),
