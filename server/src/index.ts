@@ -171,25 +171,28 @@ function loadWaterProfile(tx: any, entityId: string | undefined) {
 }
 
 function loadSchedule(tx: any, processEntityId: string) {
-  const schedules = [...tx.db.ScheduleTable.byProcessEntityId.filter(processEntityId)];
-  if (schedules.length === 0) return null;
-  const schedule = schedules[0];
-  const events = [...tx.db.ScheduleEvent.byScheduleId.filter(schedule.id)]
+  const tasks = [...tx.db.TaskSpec.byProcessEntityId.filter(processEntityId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
+  if (tasks.length === 0) return null;
+
+  // Determine workflow kind from the process
+  const process = tx.db.Process.entityId.find(processEntityId);
+  const workflowKind = process?.processKind?.tag ?? 'koji';
+
+  // Group by sectionKey to reconstruct ScheduleTemplate steps
   const steps: any[] = [];
   let currentStep: any = null;
 
-  for (const evt of events) {
-    const atH = evt.hoursFromStart ?? 0;
-    switch (evt.kind.tag) {
+  for (const task of tasks) {
+    switch (task.taskKind.tag) {
       case 'milestone':
         currentStep = {
-          key: evt.label.toLowerCase().replace(/[\s/]+/g, '_'),
-          label: evt.label,
-          atH,
-          durationH: evt.durationH,
-          notes: evt.note ? [evt.note] : [],
+          key: task.sectionKey ?? task.key,
+          label: task.label,
+          atH: task.hoursFromStart ?? 0,
+          durationH: task.durationH,
+          notes: task.notes ? [task.notes] : [],
           goals: [],
           checks: [],
           actions: [],
@@ -197,20 +200,22 @@ function loadSchedule(tx: any, processEntityId: string) {
         steps.push(currentStep);
         break;
       case 'goal':
-        if (currentStep) currentStep.goals.push({ description: evt.description ?? evt.label });
+        if (currentStep) currentStep.goals.push({ description: task.description ?? task.label });
         break;
       case 'check':
-        if (currentStep) currentStep.checks.push({ description: evt.description ?? evt.label });
+        if (currentStep) currentStep.checks.push({ description: task.description ?? task.label });
         break;
       case 'action':
-        if (currentStep) currentStep.actions.push({ description: evt.description ?? evt.label });
+        if (currentStep) currentStep.actions.push({ description: task.description ?? task.label });
         break;
     }
   }
 
+  // Look up the process entity for the name
+  const entity = tx.db.Entity.id.find(processEntityId);
   return {
-    name: schedule.name,
-    workflow: { kind: schedule.workflowKind.tag },
+    name: entity?.name ? `${entity.name} Schedule` : 'Schedule',
+    workflow: { kind: workflowKind },
     steps,
   };
 }

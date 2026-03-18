@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { insertScheduleSteps, type SeedStep } from './seedDataHelpers';
+import { insertTaskSpecSteps, type SeedStep } from './seedDataHelpers';
 
 export function seedLibrary(ctx: any): void {
   const now = ctx.timestamp;
@@ -44,10 +44,7 @@ export function seedLibrary(ctx: any): void {
     ctx.db.ProcessParamSpec.insert({ id: 'pps-koji-ueda-2', processEntityId: kojiEntityId, ordinal: 2, key: 'carrier_name', label: 'Carrier', valueType: { tag: 'text' }, unit: undefined, defaultNumberValue: undefined, defaultTextValue: 'Toasted Rice Flour', defaultBoolValue: undefined, notes: undefined });
     ctx.db.ProcessParamSpec.insert({ id: 'pps-koji-ueda-3', processEntityId: kojiEntityId, ordinal: 3, key: 'carrier_ratio_g_per_g', label: 'Carrier Ratio', valueType: { tag: 'number' }, unit: 'g/g', defaultNumberValue: 5, defaultTextValue: undefined, defaultBoolValue: undefined, notes: undefined });
 
-    // Koji schedule
-    const kojiSchedId = ctx.newUuidV4().toString();
-    ctx.db.ScheduleTable.insert({ id: kojiSchedId, processEntityId: kojiEntityId, workflowKind: { tag: 'koji' }, name: 'Ueda Koji Schedule' });
-
+    // Koji schedule (TaskSpec rows)
     const kojiSteps: SeedStep[] = [
       { label: 'Soak + Drain Rest', atH: 0, durationH: 4, goals: ['Target 29–32% weight gain by end of soak/drain period'], checks: [], actions: ['Soak rice to target absorption, drain, then rest to allow moisture to distribute evenly'] },
       { label: 'Steam Rice', atH: 4, durationH: 1, goals: ['Target 42–43% post-steam weight gain (40–44% acceptable)'], checks: [], actions: ['Steam thoroughly until grains are evenly gelatinized through the center'] },
@@ -61,7 +58,7 @@ export function seedLibrary(ctx: any): void {
       { label: 'De-koji', atH: 50, durationH: undefined, goals: ['Typical finish is 48–50 hours from tane-kiri', 'Final weight ratio often lands around 13–17%, though 10–20% is acceptable'], checks: ['Usually finish 10–18 hours after peak temperature is reached', 'Cool in a dry place or fridge, but do not seal immediately to avoid condensation'], actions: ['Remove koji from chamber, record final weight, and cool gradually'] },
     ];
 
-    insertScheduleSteps(ctx, kojiSchedId, kojiSteps);
+    insertTaskSpecSteps(ctx, kojiEntityId, kojiSteps);
   }
 
   // ── Moto process ──────────────────────────────────────────────────────────
@@ -98,10 +95,7 @@ export function seedLibrary(ctx: any): void {
     ctx.db.ProcessMaterialSlotSpec.insert({ id: 'pmss-moto-yeast', processEntityId: motoEntityId, stageSpecId: motoStageId, ordinal: 4, key: 'yeast', label: 'Yeast', materialClass: { tag: 'yeast' }, quantityMode: { tag: 'absolute' }, quantityValue: undefined, quantityUnit: undefined, notes: undefined });
     ctx.db.ProcessMaterialSlotSpec.insert({ id: 'pmss-moto-acid', processEntityId: motoEntityId, stageSpecId: motoStageId, ordinal: 5, key: 'acid', label: 'Acid', materialClass: { tag: 'acid' }, quantityMode: { tag: 'absolute' }, quantityValue: undefined, quantityUnit: undefined, notes: undefined });
 
-    // Moto schedule
-    const motoSchedId = ctx.newUuidV4().toString();
-    ctx.db.ScheduleTable.insert({ id: motoSchedId, processEntityId: motoEntityId, workflowKind: { tag: 'moto' }, name: 'Sokujo Moto Schedule' });
-
+    // Moto schedule (TaskSpec rows)
     const motoSteps: SeedStep[] = [
       { label: 'Prepare Moto Water', atH: 0, durationH: 1, goals: ['Water treated and at target temperature'], checks: [], actions: ['Measure water, add mineral salts and lactic acid, mix thoroughly'] },
       { label: 'Combine Koji, Water, and Yeast', atH: 1, durationH: undefined, goals: ['Koji hydrated and yeast pitched'], checks: [], actions: ['Add koji to treated water, stir to break up clumps', 'Pitch yeast into the mixture'] },
@@ -110,7 +104,7 @@ export function seedLibrary(ctx: any): void {
       { label: 'Moto Ready', atH: 338, durationH: undefined, goals: ['Moto is mature and ready for moromi build'], checks: ['Confirm healthy yeast population before proceeding to soe'], actions: [] },
     ];
 
-    insertScheduleSteps(ctx, motoSchedId, motoSteps);
+    insertTaskSpecSteps(ctx, motoEntityId, motoSteps);
   }
 
   // ── Moromi process ────────────────────────────────────────────────────────
