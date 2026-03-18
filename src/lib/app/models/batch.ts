@@ -1,4 +1,4 @@
-export type BatchStatus = 'planned' | 'in_progress' | 'completed';
+export type BatchStatus = 'planned' | 'in_progress' | 'complete' | 'abandoned';
 
 export type Batch = {
 	id: string;
