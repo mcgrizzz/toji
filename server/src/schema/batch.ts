@@ -170,3 +170,26 @@ export const BatchMaterialPlan = table(
     notes: t.option(t.string()),
   }
 );
+
+// ── Future concepts (not yet implemented) ─────────────────────────────────────
+//
+// Block
+//   A discrete unit of work within a stage (e.g. "rice prep block" containing
+//   rinse → soak → drain → steam). Blocks group steps for reuse and calculator
+//   attachment.
+//
+// TaskSpec
+//   An individual actionable task within a block, with timing, instructions,
+//   and field captures.
+//
+// BatchTaskInstance
+//   Runtime instance of a TaskSpec within a batch execution, tracking status,
+//   completion, and actual values.
+//
+// ObservationSetSpec / ObservationValueSpec
+//   Structured logging definitions — what measurements to capture at each
+//   observation point (temperature, pH, baumé, etc.).
+//
+// ToolAttachment / ToolOutputBinding
+//   Attaches calculators or external tools to blocks/tasks, with bindings
+//   that map tool outputs back to step field values.
