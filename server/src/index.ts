@@ -1,4 +1,5 @@
 import { t } from 'spacetimedb/server';
+import { Timestamp } from 'spacetimedb';
 import spacetimedb from './schema';
 import { seedDemoData as seedDemoDataFn } from './seed/seedData';
 
@@ -17,6 +18,11 @@ function tsToIso(ts: { toISOString(): string }): string {
 
 function isSystemOwner(ownerId: string): boolean {
   return ownerId === '__system__';
+}
+
+function addHours(ts: Timestamp, hours: number): Timestamp {
+  const microsToAdd = BigInt(Math.round(hours * 3_600_000_000));
+  return new Timestamp(ts.microsSinceUnixEpoch + microsToAdd);
 }
 
 // ── Generic process loaders ─────────────────────────────────────────────────
@@ -459,6 +465,126 @@ export const getMyBatches = spacetimedb.procedure(
   })
 );
 
+export const getBatchDetail = spacetimedb.procedure(
+  { batchId: t.string() },
+  t.string(),
+  (ctx, { batchId }) => ctx.withTx(tx => {
+    const senderId = ctx.sender.toHexString();
+    const batch = tx.db.Batch.id.find(batchId);
+    if (!batch) throw new Error(`Batch ${batchId} not found`);
+    if (batch.ownerId !== senderId) throw new Error('Not the owner');
+
+    // Load processes sorted by ordinal
+    const processes = [...tx.db.BatchProcessInstance.byBatchId.filter(batchId)]
+      .sort((a: any, b: any) => a.ordinal - b.ordinal);
+
+    const processResults = processes.map((bpi: any) => {
+      // Stages
+      const stages = [...tx.db.BatchStageInstance.byBatchProcessInstanceId.filter(bpi.id)]
+        .sort((a: any, b: any) => a.ordinal - b.ordinal);
+
+      const stageResults = stages.map((bsi: any) => {
+        const steps = [...tx.db.BatchStepInstance.byBatchStageInstanceId.filter(bsi.id)]
+          .sort((a: any, b: any) => a.ordinal - b.ordinal);
+
+        return {
+          id: bsi.id,
+          label: bsi.label,
+          ordinal: bsi.ordinal,
+          status: bsi.status.tag,
+          startedAt: bsi.startedAt ? tsToIso(bsi.startedAt) : undefined,
+          completedAt: bsi.completedAt ? tsToIso(bsi.completedAt) : undefined,
+          steps: steps.map((step: any) => ({
+            id: step.id,
+            label: step.label,
+            ordinal: step.ordinal,
+            renderedInstruction: step.renderedInstruction,
+            sectionKey: step.sectionKey,
+            sectionLabel: step.sectionLabel,
+            status: step.status.tag,
+            dueAt: step.dueAt ? tsToIso(step.dueAt) : undefined,
+            completedAt: step.completedAt ? tsToIso(step.completedAt) : undefined,
+            notes: step.notes,
+          })),
+        };
+      });
+
+      // Tasks grouped by section
+      const tasks = [...tx.db.BatchTaskInstance.byBatchProcessInstanceId.filter(bpi.id)]
+        .sort((a: any, b: any) => a.ordinal - b.ordinal);
+
+      const sectionMap = new Map<string | null, { sectionKey: string | null; sectionLabel: string | null; tasks: any[] }>();
+      for (const task of tasks) {
+        const key = task.sectionKey ?? null;
+        if (!sectionMap.has(key)) {
+          sectionMap.set(key, {
+            sectionKey: task.sectionKey ?? null,
+            sectionLabel: task.sectionLabel ?? null,
+            tasks: [],
+          });
+        }
+        sectionMap.get(key)!.tasks.push({
+          id: task.id,
+          label: task.label,
+          ordinal: task.ordinal,
+          key: task.key,
+          taskKind: task.taskKind.tag,
+          status: task.status.tag,
+          dueAt: task.dueAt ? tsToIso(task.dueAt) : undefined,
+          completedAt: task.completedAt ? tsToIso(task.completedAt) : undefined,
+          notes: task.notes,
+        });
+      }
+
+      return {
+        id: bpi.id,
+        label: bpi.label,
+        ordinal: bpi.ordinal,
+        status: bpi.status.tag,
+        startedAt: bpi.startedAt ? tsToIso(bpi.startedAt) : undefined,
+        completedAt: bpi.completedAt ? tsToIso(bpi.completedAt) : undefined,
+        stages: stageResults,
+        taskSections: [...sectionMap.values()],
+      };
+    });
+
+    // Materials
+    const materials = [...tx.db.BatchMaterialPlan.byBatchId.filter(batchId)].map((m: any) => ({
+      id: m.id,
+      batchProcessInstanceId: m.batchProcessInstanceId,
+      batchStageInstanceId: m.batchStageInstanceId,
+      label: m.label,
+      materialClass: m.materialClass.tag,
+      plannedQuantity: m.plannedQuantity,
+      plannedUnit: m.plannedUnit,
+      inventoryRefType: m.inventoryRefType,
+      inventoryRefId: m.inventoryRefId,
+      customName: m.customName,
+      notes: m.notes,
+    }));
+
+    const entity = tx.db.Entity.id.find(batch.batchRecipeEntityId);
+    return JSON.stringify({
+      batch: {
+        id: batch.id,
+        name: batch.name,
+        status: batch.status.tag,
+        targetKind: batch.targetKind.tag,
+        targetValue: batch.targetValue,
+        createdAt: tsToIso(batch.createdAt),
+        startedAt: batch.startedAt ? tsToIso(batch.startedAt) : undefined,
+        completedAt: batch.completedAt ? tsToIso(batch.completedAt) : undefined,
+        notes: batch.notes,
+        sourceRecipeEntityId: batch.sourceRecipeEntityId,
+        batchRecipeEntityId: batch.batchRecipeEntityId,
+        recipeName: entity?.name ?? 'Unknown',
+      },
+      processes: processResults,
+      materials,
+    });
+  })
+);
+
 // ── Write procedures ────────────────────────────────────────────────────────
 
 // ── Shared recipe copy helper ────────────────────────────────────────────────
@@ -665,6 +791,8 @@ export const createBatch = spacetimedb.procedure(
       // Stages
       const stages = loadProcessStages(tx, rpu.processSnapshotEntityId);
       const kindStageMap = stageInstancesByProcessKind.get(processKind) ?? new Map<number, string>();
+      const stageSpecToInstanceId = new Map<string, string>();
+      const stepSpecToInstanceId = new Map<string, string>();
 
       for (const stage of stages) {
         const bsiId = tx.newUuidV4().toString();
@@ -679,6 +807,8 @@ export const createBatch = spacetimedb.procedure(
           startedAt: undefined,
           completedAt: undefined,
         });
+
+        stageSpecToInstanceId.set(stage.id, bsiId);
 
         if (stage.materialOrdinal != null) {
           kindStageMap.set(stage.materialOrdinal, bsiId);
@@ -704,6 +834,8 @@ export const createBatch = spacetimedb.procedure(
             notes: undefined,
           });
 
+          stepSpecToInstanceId.set(step.id, bstepId);
+
           // Step fields
           const fields = loadProcessStepFields(tx, step.id);
           for (const field of fields) {
@@ -725,6 +857,52 @@ export const createBatch = spacetimedb.procedure(
       }
 
       stageInstancesByProcessKind.set(processKind, kindStageMap);
+
+      // ── Task instance rows for this process ───────────────────────────
+
+      const taskSpecs = [...tx.db.TaskSpec.byProcessEntityId.filter(rpu.processSnapshotEntityId)]
+        .sort((a: any, b: any) => a.ordinal - b.ordinal);
+
+      for (const spec of taskSpecs) {
+        const bsiId = spec.stageSpecId ? stageSpecToInstanceId.get(spec.stageSpecId) : undefined;
+        const bstepId = spec.stepSpecId ? stepSpecToInstanceId.get(spec.stepSpecId) : undefined;
+
+        // Compute dueAt (will be undefined for new batches since nothing has startedAt yet)
+        let dueAt: any = undefined;
+        if (spec.timingKind.tag === 'absolute' && spec.hoursFromStart != null) {
+          const bpi = tx.db.BatchProcessInstance.id.find(bpiId);
+          if (bpi?.startedAt) {
+            dueAt = addHours(bpi.startedAt, spec.hoursFromStart);
+          }
+        } else if (spec.timingKind.tag === 'relative_to_stage' && spec.anchorStageSpecId && spec.offsetHours != null) {
+          const anchorBsiId = stageSpecToInstanceId.get(spec.anchorStageSpecId);
+          if (anchorBsiId) {
+            const anchorBsi = tx.db.BatchStageInstance.id.find(anchorBsiId);
+            if (anchorBsi?.startedAt) {
+              dueAt = addHours(anchorBsi.startedAt, spec.offsetHours);
+            }
+          }
+        }
+
+        tx.db.BatchTaskInstance.insert({
+          id: tx.newUuidV4().toString(),
+          batchId,
+          batchProcessInstanceId: bpiId,
+          batchStageInstanceId: bsiId,
+          batchStepInstanceId: bstepId,
+          taskSpecId: spec.id,
+          ordinal: spec.ordinal,
+          key: spec.key,
+          label: spec.label,
+          taskKind: spec.taskKind,
+          sectionKey: spec.sectionKey,
+          sectionLabel: spec.sectionLabel,
+          dueAt,
+          status: { tag: 'pending' },
+          completedAt: undefined,
+          notes: undefined,
+        });
+      }
 
       // ── Material plan rows for this process ────────────────────────────
 
