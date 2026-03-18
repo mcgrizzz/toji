@@ -45,6 +45,19 @@ const ScheduleEventKind = t.enum('ScheduleEventKind', [
 
 const TimingKind = t.enum('TimingKind', ['absolute', 'relative_to_stage']);
 
+export const TaskKind = t.enum('TaskKind', [
+  'milestone',
+  'goal',
+  'check',
+  'action',
+  'measurement',
+]);
+
+const TaskTimingKind = t.enum('TaskTimingKind', [
+  'absolute',
+  'relative_to_stage',
+]);
+
 // ── User ──────────────────────────────────────────────────────────────────────
 
 export const User = table(
@@ -237,6 +250,38 @@ export const ProcessStepFieldSpec = table(
   }
 );
 
+// ── Task spec tables ──────────────────────────────────────────────────────────
+
+export const TaskSpec = table(
+  {
+    name: 'task_spec',
+    public: true,
+    indexes: [
+      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    processEntityId: t.string(),
+    stageSpecId: t.option(t.string()),
+    stepSpecId: t.option(t.string()),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    taskKind: TaskKind,
+    sectionKey: t.option(t.string()),
+    sectionLabel: t.option(t.string()),
+    timingKind: TaskTimingKind,
+    hoursFromStart: t.option(t.f64()),
+    anchorStageSpecId: t.option(t.string()),
+    offsetHours: t.option(t.f64()),
+    durationH: t.option(t.f64()),
+    description: t.option(t.string()),
+    captureActualOnComplete: t.bool(),
+    notes: t.option(t.string()),
+  }
+);
+
 // ── Recipe composition tables ───────────────────────────────────────────────
 
 export const RecipeProcessUse = table(
@@ -316,7 +361,10 @@ export const WaterProfileIon = table(
   }
 );
 
-// ── Schedule tables ───────────────────────────────────────────────────────────
+// ── DEPRECATED: Schedule tables ───────────────────────────────────────────────
+// These tables are superseded by TaskSpec. They remain present for migration
+// continuity only. No new code should treat them as authoritative.
+// Remove in the next schema migration commit.
 
 // TODO: Migrate schedule to reference ProcessStageSpec/ProcessStepSpec directly
 export const ScheduleTable = table(

@@ -27,6 +27,7 @@ export {
   RecipeMaterialSpec,
   RecipeProcessMaterialBinding,
   WaterProfileIon,
+  TaskSpec,
   ScheduleTable,
   ScheduleEvent,
 } from './recipe';
@@ -38,6 +39,7 @@ export {
   BatchStepInstance,
   BatchStepFieldValue,
   BatchMaterialPlan,
+  BatchTaskInstance,
 } from './batch';
 
 import {
@@ -67,6 +69,7 @@ import {
   RecipeMaterialSpec,
   RecipeProcessMaterialBinding,
   WaterProfileIon,
+  TaskSpec,
   ScheduleTable,
   ScheduleEvent,
 } from './recipe';
@@ -78,6 +81,7 @@ import {
   BatchStepInstance,
   BatchStepFieldValue,
   BatchMaterialPlan,
+  BatchTaskInstance,
 } from './batch';
 
 export default schema({
@@ -95,6 +99,7 @@ export default schema({
   RecipeMaterialSpec,
   RecipeProcessMaterialBinding,
   WaterProfileIon,
+  TaskSpec,
   ScheduleTable,
   ScheduleEvent,
   CatalogRiceVariety,
@@ -112,4 +117,5 @@ export default schema({
   BatchStepInstance,
   BatchStepFieldValue,
   BatchMaterialPlan,
+  BatchTaskInstance,
 });

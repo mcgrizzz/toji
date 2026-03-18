@@ -1,5 +1,5 @@
 import { table, t } from 'spacetimedb/server';
-import { MaterialClass } from './recipe';
+import { MaterialClass, TaskKind } from './recipe';
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -11,6 +11,13 @@ const BatchStatus = t.enum('BatchStatus', [
 ]);
 
 const TargetKind = t.enum('TargetKind', ['genshu_volume_L', 'total_rice_kg']);
+
+const ExecutionStatus = t.enum('ExecutionStatus', [
+  'pending',
+  'in_progress',
+  'complete',
+  'skipped',
+]);
 
 // ── Batch table ──────────────────────────────────────────────────────────────
 
@@ -57,7 +64,7 @@ export const BatchProcessInstance = table(
     ordinal: t.i32(),
     processSnapshotEntityId: t.string(),
     label: t.string(),
-    status: BatchStatus,
+    status: ExecutionStatus,
     startedAt: t.option(t.timestamp()),
     completedAt: t.option(t.timestamp()),
   }
@@ -77,7 +84,7 @@ export const BatchStageInstance = table(
     stageSpecId: t.string(),
     ordinal: t.i32(),
     label: t.string(),
-    status: BatchStatus,
+    status: ExecutionStatus,
     startedAt: t.option(t.timestamp()),
     completedAt: t.option(t.timestamp()),
   }
@@ -100,7 +107,7 @@ export const BatchStepInstance = table(
     renderedInstruction: t.string(),
     sectionKey: t.option(t.string()),
     sectionLabel: t.option(t.string()),
-    status: BatchStatus,
+    status: ExecutionStatus,
     dueAt: t.option(t.timestamp()),
     completedAt: t.option(t.timestamp()),
     notes: t.option(t.string()),
@@ -156,20 +163,41 @@ export const BatchMaterialPlan = table(
   }
 );
 
+export const BatchTaskInstance = table(
+  {
+    name: 'batch_task_instance',
+    public: true,
+    indexes: [
+      { accessor: 'byBatchId', algorithm: 'btree' as const, columns: ['batchId'] },
+      { accessor: 'byBatchProcessInstanceId', algorithm: 'btree' as const, columns: ['batchProcessInstanceId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    batchId: t.string(),
+    batchProcessInstanceId: t.string(),
+    batchStageInstanceId: t.option(t.string()),
+    batchStepInstanceId: t.option(t.string()),
+    taskSpecId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    taskKind: TaskKind,
+    sectionKey: t.option(t.string()),
+    sectionLabel: t.option(t.string()),
+    dueAt: t.option(t.timestamp()),
+    status: ExecutionStatus,
+    completedAt: t.option(t.timestamp()),
+    notes: t.option(t.string()),
+  }
+);
+
 // ── Future concepts (not yet implemented) ─────────────────────────────────────
 //
 // Block
 //   A discrete unit of work within a stage (e.g. "rice prep block" containing
 //   rinse → soak → drain → steam). Blocks group steps for reuse and calculator
 //   attachment.
-//
-// TaskSpec
-//   An individual actionable task within a block, with timing, instructions,
-//   and field captures.
-//
-// BatchTaskInstance
-//   Runtime instance of a TaskSpec within a batch execution, tracking status,
-//   completion, and actual values.
 //
 // ObservationSetSpec / ObservationValueSpec
 //   Structured logging definitions — what measurements to capture at each

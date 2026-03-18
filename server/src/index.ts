@@ -650,7 +650,7 @@ export const createBatch = spacetimedb.procedure(
         ordinal: rpu.ordinal,
         processSnapshotEntityId: rpu.processSnapshotEntityId,
         label: rpu.label,
-        status: { tag: 'planned' },
+        status: { tag: 'pending' },
         startedAt: undefined,
         completedAt: undefined,
       });
@@ -670,7 +670,7 @@ export const createBatch = spacetimedb.procedure(
           stageSpecId: stage.id,
           ordinal: stage.ordinal,
           label: stage.label,
-          status: { tag: 'planned' },
+          status: { tag: 'pending' },
           startedAt: undefined,
           completedAt: undefined,
         });
@@ -693,7 +693,7 @@ export const createBatch = spacetimedb.procedure(
             renderedInstruction: step.instructionTemplate,
             sectionKey: step.sectionKey,
             sectionLabel: step.sectionLabel,
-            status: { tag: 'planned' },
+            status: { tag: 'pending' },
             dueAt: undefined,
             completedAt: undefined,
             notes: undefined,
