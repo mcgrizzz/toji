@@ -14,7 +14,7 @@ const ProvenanceKind = t.enum('ProvenanceKind', [
 
 const ProcessKind = t.enum('ProcessKind', ['koji', 'moto', 'moromi', 'other']);
 
-const MaterialClass = t.enum('MaterialClass', [
+export const MaterialClass = t.enum('MaterialClass', [
   'rice',
   'koji',
   'water',

@@ -32,7 +32,15 @@ export {
   ScheduleEvent,
 } from './recipe';
 
-export { Batch } from './batch';
+export {
+  Batch,
+  BatchProcessInstance,
+  BatchStageInstance,
+  BatchSubstageInstance,
+  BatchStepInstance,
+  BatchStepFieldValue,
+  BatchMaterialPlan,
+} from './batch';
 
 import {
   CatalogRiceVariety,
@@ -66,7 +74,15 @@ import {
   ScheduleEvent,
 } from './recipe';
 
-import { Batch } from './batch';
+import {
+  Batch,
+  BatchProcessInstance,
+  BatchStageInstance,
+  BatchSubstageInstance,
+  BatchStepInstance,
+  BatchStepFieldValue,
+  BatchMaterialPlan,
+} from './batch';
 
 export default schema({
   User,
@@ -96,4 +112,10 @@ export default schema({
   InventoryYeastStock,
   InventoryKojiSporeLot,
   Batch,
+  BatchProcessInstance,
+  BatchStageInstance,
+  BatchSubstageInstance,
+  BatchStepInstance,
+  BatchStepFieldValue,
+  BatchMaterialPlan,
 });

@@ -65,6 +65,21 @@ function loadRecipeMaterialBindings(tx: any, rpuId: string) {
   return [...tx.db.RecipeProcessMaterialBinding.byRecipeProcessUseId.filter(rpuId)];
 }
 
+function loadProcessSubstages(tx: any, stageSpecId: string) {
+  return [...tx.db.ProcessSubstageSpec.byStageSpecId.filter(stageSpecId)]
+    .sort((a: any, b: any) => a.ordinal - b.ordinal);
+}
+
+function loadProcessSteps(tx: any, substageSpecId: string) {
+  return [...tx.db.ProcessStepSpec.bySubstageSpecId.filter(substageSpecId)]
+    .sort((a: any, b: any) => a.ordinal - b.ordinal);
+}
+
+function loadProcessStepFields(tx: any, stepSpecId: string) {
+  return [...tx.db.ProcessStepFieldSpec.byStepSpecId.filter(stepSpecId)]
+    .sort((a: any, b: any) => a.ordinal - b.ordinal);
+}
+
 // ── Compatibility projection helpers ────────────────────────────────────────
 
 function projectKojiPresetFromProcess(entity: any, paramMap: Map<string, number | string | boolean>) {
@@ -426,12 +441,15 @@ export const getMyBatches = spacetimedb.procedure(
     const senderId = ctx.sender.toHexString();
     const batches = [...tx.db.Batch.byOwnerId.filter(senderId)];
     return JSON.stringify(batches.map((b: any) => {
-      const entity = tx.db.Entity.id.find(b.recipeSnapshotEntityId);
+      const entity = tx.db.Entity.id.find(b.batchRecipeEntityId);
       return {
         id: b.id,
-        recipeSnapshotId: b.recipeSnapshotEntityId,
+        sourceRecipeEntityId: b.sourceRecipeEntityId,
+        batchRecipeEntityId: b.batchRecipeEntityId,
         recipeName: entity?.name ?? 'Unknown',
         status: b.status.tag,
+        targetKind: b.targetKind.tag,
+        targetValue: b.targetValue,
         createdAt: tsToIso(b.createdAt),
         startedAt: b.startedAt ? tsToIso(b.startedAt) : undefined,
         completedAt: b.completedAt ? tsToIso(b.completedAt) : undefined,
@@ -443,6 +461,108 @@ export const getMyBatches = spacetimedb.procedure(
 
 // ── Write procedures ────────────────────────────────────────────────────────
 
+// ── Shared recipe copy helper ────────────────────────────────────────────────
+
+function copyRecipeEntity(tx: any, sourceEntityId: string, senderId: string, overrides: {
+  entityKind: 'working' | 'snapshot';
+  attachedBatchId?: string;
+  version?: string;
+  lineageRootId?: string;
+  provenanceKind?: string;
+  provenanceEntityId?: string;
+}): { newEntityId: string; rpuIdMap: Map<string, string>; rmsIdMap: Map<string, string> } {
+  const sourceEntity = tx.db.Entity.id.find(sourceEntityId);
+  if (!sourceEntity) throw new Error(`Entity ${sourceEntityId} not found`);
+  const sourcePayload = tx.db.Recipe.entityId.find(sourceEntityId);
+  if (!sourcePayload) throw new Error(`Recipe payload ${sourceEntityId} not found`);
+
+  const newEntityId = tx.newUuidV4().toString();
+  const now = tx.timestamp;
+
+  // Copy Entity
+  tx.db.Entity.insert({
+    id: newEntityId,
+    ownerId: senderId,
+    dataType: { tag: 'recipe' },
+    entityKind: { tag: overrides.entityKind },
+    name: sourceEntity.name,
+    description: sourceEntity.description,
+    version: overrides.version,
+    isPublic: false,
+    isArchived: false,
+    lineageRootId: overrides.lineageRootId ?? newEntityId,
+    parentEntityId: sourceEntityId,
+    provenanceKind: overrides.provenanceKind
+      ? { tag: overrides.provenanceKind }
+      : sourceEntity.provenanceKind,
+    provenanceEntityId: overrides.provenanceEntityId ?? sourceEntity.provenanceEntityId,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // Copy Recipe payload
+  tx.db.Recipe.insert({
+    entityId: newEntityId,
+    defaultWaterProfileEntityId: sourcePayload.defaultWaterProfileEntityId,
+    attachedBatchId: overrides.attachedBatchId,
+    notes: sourcePayload.notes,
+  });
+
+  // Copy RecipeProcessUse rows with ID remapping
+  const sourceRpus = loadRecipeProcessUses(tx, sourceEntityId);
+  const rpuIdMap = new Map<string, string>();
+  for (const rpu of sourceRpus) {
+    const newRpuId = tx.newUuidV4().toString();
+    rpuIdMap.set(rpu.id, newRpuId);
+    tx.db.RecipeProcessUse.insert({
+      id: newRpuId,
+      recipeEntityId: newEntityId,
+      ordinal: rpu.ordinal,
+      label: rpu.label,
+      processSnapshotEntityId: rpu.processSnapshotEntityId,
+      notes: rpu.notes,
+    });
+  }
+
+  // Copy RecipeMaterialSpec rows with ID remapping
+  const sourceRms = loadRecipeMaterialSpecs(tx, sourceEntityId);
+  const rmsIdMap = new Map<string, string>();
+  for (const rms of sourceRms) {
+    const newRmsId = tx.newUuidV4().toString();
+    rmsIdMap.set(rms.id, newRmsId);
+    tx.db.RecipeMaterialSpec.insert({
+      id: newRmsId,
+      recipeEntityId: newEntityId,
+      key: rms.key,
+      label: rms.label,
+      materialClass: rms.materialClass,
+      defaultUnit: rms.defaultUnit,
+      catalogRefType: rms.catalogRefType,
+      catalogRefId: rms.catalogRefId,
+      customName: rms.customName,
+      notes: rms.notes,
+    });
+  }
+
+  // Copy RecipeProcessMaterialBinding rows with remapped IDs
+  for (const [oldRpuId, newRpuId] of rpuIdMap) {
+    const bindings = loadRecipeMaterialBindings(tx, oldRpuId);
+    for (const b of bindings) {
+      tx.db.RecipeProcessMaterialBinding.insert({
+        id: tx.newUuidV4().toString(),
+        recipeProcessUseId: newRpuId,
+        processMaterialSlotSpecId: b.processMaterialSlotSpecId,
+        recipeMaterialSpecId: rmsIdMap.get(b.recipeMaterialSpecId) ?? b.recipeMaterialSpecId,
+        quantityOverride: b.quantityOverride,
+        quantityUnitOverride: b.quantityUnitOverride,
+        notes: b.notes,
+      });
+    }
+  }
+
+  return { newEntityId, rpuIdMap, rmsIdMap };
+}
+
 export const copyRecipeSnapshotToRecipe = spacetimedb.procedure(
   { snapshotId: t.string() },
   t.string(),
@@ -453,91 +573,12 @@ export const copyRecipeSnapshotToRecipe = spacetimedb.procedure(
     if (sourceEntity.entityKind.tag !== 'snapshot') throw new Error('Not a snapshot');
     if (sourceEntity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
 
-    const sourcePayload = tx.db.Recipe.entityId.find(snapshotId);
-    if (!sourcePayload) throw new Error(`Recipe payload ${snapshotId} not found`);
-
-    const newEntityId = tx.newUuidV4().toString();
-    const now = tx.timestamp;
     const senderId = tx.sender.toHexString();
-
-    // Copy Entity
-    tx.db.Entity.insert({
-      id: newEntityId,
-      ownerId: senderId,
-      dataType: { tag: 'recipe' },
-      entityKind: { tag: 'working' },
-      name: sourceEntity.name,
-      description: sourceEntity.description,
-      version: undefined,
-      isPublic: false,
-      isArchived: false,
-      lineageRootId: newEntityId,
-      parentEntityId: snapshotId,
-      provenanceKind: { tag: 'copied_from_public' },
+    const { newEntityId } = copyRecipeEntity(tx, snapshotId, senderId, {
+      entityKind: 'working',
+      provenanceKind: 'copied_from_public',
       provenanceEntityId: snapshotId,
-      createdAt: now,
-      updatedAt: now,
     });
-
-    // Copy Recipe
-    tx.db.Recipe.insert({
-      entityId: newEntityId,
-      defaultWaterProfileEntityId: sourcePayload.defaultWaterProfileEntityId,
-      attachedBatchId: undefined,
-      notes: sourcePayload.notes,
-    });
-
-    // Copy RecipeProcessUse rows with ID remapping
-    const sourceRpus = loadRecipeProcessUses(tx, snapshotId);
-    const rpuIdMap = new Map<string, string>();
-    for (const rpu of sourceRpus) {
-      const newRpuId = tx.newUuidV4().toString();
-      rpuIdMap.set(rpu.id, newRpuId);
-      tx.db.RecipeProcessUse.insert({
-        id: newRpuId,
-        recipeEntityId: newEntityId,
-        ordinal: rpu.ordinal,
-        label: rpu.label,
-        processSnapshotEntityId: rpu.processSnapshotEntityId,
-        notes: rpu.notes,
-      });
-    }
-
-    // Copy RecipeMaterialSpec rows with ID remapping
-    const sourceRms = loadRecipeMaterialSpecs(tx, snapshotId);
-    const rmsIdMap = new Map<string, string>();
-    for (const rms of sourceRms) {
-      const newRmsId = tx.newUuidV4().toString();
-      rmsIdMap.set(rms.id, newRmsId);
-      tx.db.RecipeMaterialSpec.insert({
-        id: newRmsId,
-        recipeEntityId: newEntityId,
-        key: rms.key,
-        label: rms.label,
-        materialClass: rms.materialClass,
-        defaultUnit: rms.defaultUnit,
-        catalogRefType: rms.catalogRefType,
-        catalogRefId: rms.catalogRefId,
-        customName: rms.customName,
-        notes: rms.notes,
-      });
-    }
-
-    // Copy RecipeProcessMaterialBinding rows with remapped IDs
-    for (const [oldRpuId, newRpuId] of rpuIdMap) {
-      const bindings = loadRecipeMaterialBindings(tx, oldRpuId);
-      for (const b of bindings) {
-        tx.db.RecipeProcessMaterialBinding.insert({
-          id: tx.newUuidV4().toString(),
-          recipeProcessUseId: newRpuId,
-          processMaterialSlotSpecId: b.processMaterialSlotSpecId,
-          recipeMaterialSpecId: rmsIdMap.get(b.recipeMaterialSpecId) ?? b.recipeMaterialSpecId,
-          quantityOverride: b.quantityOverride,
-          quantityUnitOverride: b.quantityUnitOverride,
-          notes: b.notes,
-        });
-      }
-    }
 
     return JSON.stringify({ recipeId: newEntityId });
   })
@@ -546,109 +587,39 @@ export const copyRecipeSnapshotToRecipe = spacetimedb.procedure(
 export const createBatch = spacetimedb.procedure(
   { recipeId: t.string(), selections: t.string(), version: t.option(t.string()) },
   t.string(),
-  (ctx, { recipeId, selections: _selectionsJson, version }) => ctx.withTx(tx => {
+  (ctx, { recipeId, selections: selectionsJson }) => ctx.withTx(tx => {
     const senderId = tx.sender.toHexString();
     const recipeEntity = tx.db.Entity.id.find(recipeId);
     if (!recipeEntity) throw new Error(`Recipe ${recipeId} not found`);
     if (recipeEntity.ownerId !== senderId) throw new Error('Not the owner');
     if (recipeEntity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
+    if (recipeEntity.entityKind.tag !== 'working') throw new Error('Source must be a working recipe');
 
-    const recipePayload = tx.db.Recipe.entityId.find(recipeId);
-    if (!recipePayload) throw new Error(`Recipe payload ${recipeId} not found`);
+    // Parse selections
+    const sel = JSON.parse(selectionsJson);
+    const targetKind = sel.targetKind?.tag ?? 'total_rice_kg';
+    const targetValue = sel.targetValue ?? 5.5;
 
     const now = tx.timestamp;
-    const snapshotId = tx.newUuidV4().toString();
     const batchId = tx.newUuidV4().toString();
-    const snapshotVersion = version ?? '1.0.0';
 
-    // Create snapshot entity
-    tx.db.Entity.insert({
-      id: snapshotId,
-      ownerId: senderId,
-      dataType: { tag: 'recipe' },
-      entityKind: { tag: 'snapshot' },
-      name: recipeEntity.name,
-      description: recipeEntity.description,
-      version: snapshotVersion,
-      isPublic: false,
-      isArchived: false,
-      lineageRootId: recipeEntity.lineageRootId,
-      parentEntityId: recipeId,
-      provenanceKind: recipeEntity.provenanceKind,
-      provenanceEntityId: recipeEntity.provenanceEntityId,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // Copy Recipe payload
-    tx.db.Recipe.insert({
-      entityId: snapshotId,
-      defaultWaterProfileEntityId: recipePayload.defaultWaterProfileEntityId,
+    // Create batch-private working copy of the recipe
+    const { newEntityId: batchRecipeEntityId, rpuIdMap } = copyRecipeEntity(tx, recipeId, senderId, {
+      entityKind: 'working',
       attachedBatchId: batchId,
-      notes: recipePayload.notes,
+      lineageRootId: recipeEntity.lineageRootId,
     });
 
-    // Copy RecipeProcessUse rows
-    const sourceRpus = loadRecipeProcessUses(tx, recipeId);
-    const rpuIdMap = new Map<string, string>();
-    for (const rpu of sourceRpus) {
-      const newRpuId = tx.newUuidV4().toString();
-      rpuIdMap.set(rpu.id, newRpuId);
-      tx.db.RecipeProcessUse.insert({
-        id: newRpuId,
-        recipeEntityId: snapshotId,
-        ordinal: rpu.ordinal,
-        label: rpu.label,
-        processSnapshotEntityId: rpu.processSnapshotEntityId,
-        notes: rpu.notes,
-      });
-    }
-
-    // Copy RecipeMaterialSpec rows
-    const sourceRms = loadRecipeMaterialSpecs(tx, recipeId);
-    const rmsIdMap = new Map<string, string>();
-    for (const rms of sourceRms) {
-      const newRmsId = tx.newUuidV4().toString();
-      rmsIdMap.set(rms.id, newRmsId);
-      tx.db.RecipeMaterialSpec.insert({
-        id: newRmsId,
-        recipeEntityId: snapshotId,
-        key: rms.key,
-        label: rms.label,
-        materialClass: rms.materialClass,
-        defaultUnit: rms.defaultUnit,
-        catalogRefType: rms.catalogRefType,
-        catalogRefId: rms.catalogRefId,
-        customName: rms.customName,
-        notes: rms.notes,
-      });
-    }
-
-    // Copy RecipeProcessMaterialBinding rows
-    for (const [oldRpuId, newRpuId] of rpuIdMap) {
-      const bindings = loadRecipeMaterialBindings(tx, oldRpuId);
-      for (const b of bindings) {
-        tx.db.RecipeProcessMaterialBinding.insert({
-          id: tx.newUuidV4().toString(),
-          recipeProcessUseId: newRpuId,
-          processMaterialSlotSpecId: b.processMaterialSlotSpecId,
-          recipeMaterialSpecId: rmsIdMap.get(b.recipeMaterialSpecId) ?? b.recipeMaterialSpecId,
-          quantityOverride: b.quantityOverride,
-          quantityUnitOverride: b.quantityUnitOverride,
-          notes: b.notes,
-        });
-      }
-    }
-
-    // Create batch
+    // Create Batch row
     tx.db.Batch.insert({
       id: batchId,
       ownerId: senderId,
-      recipeSnapshotEntityId: snapshotId,
+      sourceRecipeEntityId: recipeId,
+      batchRecipeEntityId,
       name: recipeEntity.name,
       status: { tag: 'planned' },
-      targetKind: { tag: 'total_rice_kg' },
-      targetValue: 5.5,
+      targetKind: { tag: targetKind },
+      targetValue,
       startedAt: undefined,
       completedAt: undefined,
       notes: undefined,
@@ -656,7 +627,215 @@ export const createBatch = spacetimedb.procedure(
       updatedAt: now,
     });
 
-    return JSON.stringify({ batchId, snapshotId });
+    // ── Instantiate execution rows ─────────────────────────────────────────
+
+    // Build a map of new RPU ids to their rows for the copied recipe
+    const newRpus = loadRecipeProcessUses(tx, batchRecipeEntityId);
+
+    // Map from new RPU id back to the original RPU id (for selection matching)
+    const reverseRpuMap = new Map<string, string>();
+    for (const [oldId, newId] of rpuIdMap) {
+      reverseRpuMap.set(newId, oldId);
+    }
+
+    // Track stage instances by process kind + materialOrdinal for selection matching
+    const stageInstancesByProcessKind = new Map<string, Map<number, string>>();
+    // Track process instances by process kind for selection matching
+    const processInstanceByKind = new Map<string, string>();
+
+    for (const rpu of newRpus) {
+      const { process } = loadProcessEntity(tx, rpu.processSnapshotEntityId);
+      const processKind = process.processKind.tag;
+      const bpiId = tx.newUuidV4().toString();
+
+      tx.db.BatchProcessInstance.insert({
+        id: bpiId,
+        batchId,
+        recipeProcessUseId: rpu.id,
+        ordinal: rpu.ordinal,
+        processSnapshotEntityId: rpu.processSnapshotEntityId,
+        label: rpu.label,
+        status: { tag: 'planned' },
+        startedAt: undefined,
+        completedAt: undefined,
+      });
+
+      processInstanceByKind.set(processKind, bpiId);
+
+      // Stages
+      const stages = loadProcessStages(tx, rpu.processSnapshotEntityId);
+      const kindStageMap = stageInstancesByProcessKind.get(processKind) ?? new Map<number, string>();
+
+      for (const stage of stages) {
+        const bsiId = tx.newUuidV4().toString();
+
+        tx.db.BatchStageInstance.insert({
+          id: bsiId,
+          batchProcessInstanceId: bpiId,
+          stageSpecId: stage.id,
+          ordinal: stage.ordinal,
+          label: stage.label,
+          status: { tag: 'planned' },
+          startedAt: undefined,
+          completedAt: undefined,
+        });
+
+        if (stage.materialOrdinal != null) {
+          kindStageMap.set(stage.materialOrdinal, bsiId);
+        }
+
+        // Substages
+        const substages = loadProcessSubstages(tx, stage.id);
+        for (const substage of substages) {
+          const bssiId = tx.newUuidV4().toString();
+
+          tx.db.BatchSubstageInstance.insert({
+            id: bssiId,
+            batchStageInstanceId: bsiId,
+            substageSpecId: substage.id,
+            ordinal: substage.ordinal,
+            label: substage.label,
+          });
+
+          // Steps
+          const steps = loadProcessSteps(tx, substage.id);
+          for (const step of steps) {
+            const bstepId = tx.newUuidV4().toString();
+
+            tx.db.BatchStepInstance.insert({
+              id: bstepId,
+              batchSubstageInstanceId: bssiId,
+              stepSpecId: step.id,
+              ordinal: step.ordinal,
+              label: step.label,
+              renderedInstruction: step.instructionTemplate,
+              status: { tag: 'planned' },
+              dueAt: undefined,
+              completedAt: undefined,
+              notes: undefined,
+            });
+
+            // Step fields
+            const fields = loadProcessStepFields(tx, step.id);
+            for (const field of fields) {
+              tx.db.BatchStepFieldValue.insert({
+                id: tx.newUuidV4().toString(),
+                batchStepInstanceId: bstepId,
+                stepFieldSpecId: field.id,
+                key: field.key,
+                plannedNumber: field.defaultNumberValue,
+                plannedText: field.defaultTextValue,
+                plannedBool: field.defaultBoolValue,
+                actualNumber: undefined,
+                actualText: undefined,
+                actualBool: undefined,
+                actualLoggedAt: undefined,
+              });
+            }
+          }
+        }
+      }
+
+      stageInstancesByProcessKind.set(processKind, kindStageMap);
+
+      // ── Material plan rows for this process ────────────────────────────
+
+      const bindings = loadRecipeMaterialBindings(tx, rpu.id);
+      for (const binding of bindings) {
+        const slotSpec = tx.db.ProcessMaterialSlotSpec.id.find(binding.processMaterialSlotSpecId);
+        const materialSpec = tx.db.RecipeMaterialSpec.id.find(binding.recipeMaterialSpecId);
+        if (!slotSpec || !materialSpec) continue;
+
+        // Find the stage instance for this slot's stage
+        let batchStageInstanceId: string | undefined;
+        if (slotSpec.stageSpecId) {
+          const stageSpec = tx.db.ProcessStageSpec.id.find(slotSpec.stageSpecId);
+          if (stageSpec?.materialOrdinal != null) {
+            batchStageInstanceId = kindStageMap.get(stageSpec.materialOrdinal);
+          }
+        }
+
+        tx.db.BatchMaterialPlan.insert({
+          id: tx.newUuidV4().toString(),
+          batchId,
+          batchProcessInstanceId: bpiId,
+          batchStageInstanceId,
+          processMaterialSlotSpecId: slotSpec.id,
+          recipeMaterialSpecId: materialSpec.id,
+          label: materialSpec.label,
+          materialClass: materialSpec.materialClass,
+          plannedQuantity: binding.quantityOverride ?? slotSpec.quantityValue,
+          plannedUnit: binding.quantityUnitOverride ?? slotSpec.quantityUnit,
+          inventoryRefType: undefined,
+          inventoryRefId: undefined,
+          customName: materialSpec.customName,
+          notes: undefined,
+        });
+      }
+    }
+
+    // ── Map selections to inventory refs ──────────────────────────────────
+
+    const materialPlans = [...tx.db.BatchMaterialPlan.byBatchId.filter(batchId)];
+
+    function assignInventoryRef(
+      materialClass: string,
+      processKind: string,
+      inventoryRefType: string,
+      inventoryRefId: string,
+      materialOrdinal?: number,
+    ) {
+      for (const plan of materialPlans) {
+        if (plan.materialClass.tag !== materialClass) continue;
+        // Match by process kind
+        const bpi = plan.batchProcessInstanceId
+          ? tx.db.BatchProcessInstance.id.find(plan.batchProcessInstanceId)
+          : null;
+        if (!bpi) continue;
+        const { process } = loadProcessEntity(tx, bpi.processSnapshotEntityId);
+        if (process.processKind.tag !== processKind) continue;
+
+        // If materialOrdinal specified, match by stage materialOrdinal
+        if (materialOrdinal != null) {
+          if (!plan.batchStageInstanceId) continue;
+          const bsi = tx.db.BatchStageInstance.id.find(plan.batchStageInstanceId);
+          if (!bsi) continue;
+          const stageSpec = tx.db.ProcessStageSpec.id.find(bsi.stageSpecId);
+          if (!stageSpec || stageSpec.materialOrdinal !== materialOrdinal) continue;
+        }
+
+        // Update the plan row
+        tx.db.BatchMaterialPlan.id.delete(plan.id);
+        tx.db.BatchMaterialPlan.insert({
+          ...plan,
+          inventoryRefType,
+          inventoryRefId,
+        });
+        return; // Only match first
+      }
+    }
+
+    if (sel.kojiRiceLotId) {
+      assignInventoryRef('rice', 'koji', 'rice_lot', sel.kojiRiceLotId);
+    }
+    if (sel.motoRiceLotId) {
+      assignInventoryRef('rice', 'moto', 'rice_lot', sel.motoRiceLotId);
+    }
+    if (sel.yeastId) {
+      assignInventoryRef('yeast', 'moto', 'yeast_stock', sel.yeastId);
+    }
+    if (sel.acidTypeId) {
+      assignInventoryRef('acid', 'moto', 'acid_type', sel.acidTypeId);
+    }
+    if (Array.isArray(sel.moromiStageLots)) {
+      for (const lot of sel.moromiStageLots) {
+        if (lot.riceLotId && lot.stageOrdinal != null) {
+          assignInventoryRef('rice', 'moromi', 'rice_lot', lot.riceLotId, lot.stageOrdinal);
+        }
+      }
+    }
+
+    return JSON.stringify({ batchId, batchRecipeEntityId });
   })
 );
 
