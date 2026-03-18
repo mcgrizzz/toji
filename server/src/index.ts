@@ -1,5 +1,6 @@
 import { t } from 'spacetimedb/server';
 import spacetimedb from './schema';
+import { seedDemoData as seedDemoDataFn } from './seed/seedData';
 
 export default spacetimedb;
 
@@ -18,59 +19,133 @@ function isSystemOwner(ownerId: string): boolean {
   return ownerId === '__system__';
 }
 
-function loadKojiMethod(tx: any, entityId: string) {
+// ── Generic process loaders ─────────────────────────────────────────────────
+
+function loadProcessEntity(tx: any, entityId: string) {
   const entity = tx.db.Entity.id.find(entityId);
-  if (!entity) throw new Error(`Koji method entity ${entityId} not found`);
-  const payload = tx.db.KojiMethod.entityId.find(entityId);
-  if (!payload) throw new Error(`Koji method payload ${entityId} not found`);
-  return {
-    id: entity.id,
-    name: entity.name,
-    isBuiltIn: isSystemOwner(entity.ownerId),
-    kojiGPerKgRice: payload.kojiGPerKgRice,
-    carrier: payload.carrierName,
-    carrierRatioGPerG: payload.carrierRatioGPerG,
-  };
+  if (!entity) throw new Error(`Process entity ${entityId} not found`);
+  const process = tx.db.Process.entityId.find(entityId);
+  if (!process) throw new Error(`Process payload ${entityId} not found`);
+  return { entity, process };
 }
 
-function loadMotoMethod(tx: any, entityId: string) {
-  const entity = tx.db.Entity.id.find(entityId);
-  if (!entity) throw new Error(`Moto method entity ${entityId} not found`);
-  const payload = tx.db.MotoMethod.entityId.find(entityId);
-  if (!payload) throw new Error(`Moto method payload ${entityId} not found`);
-  return {
-    id: entity.id,
-    name: entity.name,
-    isBuiltIn: isSystemOwner(entity.ownerId),
-    riceFrac: payload.riceFrac,
-    kojiFrac: payload.kojiFrac,
-    waterLPerKg: payload.waterLPerKg,
-    yeastPitchRateMPerMl: payload.yeastPitchRateMPerMl,
-    acidRefMlPerL: payload.acidRefMlPerL,
-    acidRefStrengthPct: payload.acidRefStrengthPct,
-  };
+function loadProcessParamMap(tx: any, entityId: string): Map<string, number | string | boolean> {
+  const rows = [...tx.db.ProcessParamSpec.byProcessEntityId.filter(entityId)];
+  const map = new Map<string, number | string | boolean>();
+  for (const r of rows) {
+    switch (r.valueType.tag) {
+      case 'number': if (r.defaultNumberValue != null) map.set(r.key, r.defaultNumberValue); break;
+      case 'text': if (r.defaultTextValue != null) map.set(r.key, r.defaultTextValue); break;
+      case 'boolean': if (r.defaultBoolValue != null) map.set(r.key, r.defaultBoolValue); break;
+    }
+  }
+  return map;
 }
 
-function loadMoromiMethod(tx: any, entityId: string) {
-  const entity = tx.db.Entity.id.find(entityId);
-  if (!entity) throw new Error(`Moromi method entity ${entityId} not found`);
-  const _payload = tx.db.MoromiMethod.entityId.find(entityId);
-  if (!_payload) throw new Error(`Moromi method payload ${entityId} not found`);
-  const stages = [...tx.db.MoromiStage.byMoromiMethodEntityId.filter(entityId)]
+function loadProcessStages(tx: any, entityId: string) {
+  return [...tx.db.ProcessStageSpec.byProcessEntityId.filter(entityId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
+}
+
+function loadProcessMaterialSlots(tx: any, entityId: string) {
+  return [...tx.db.ProcessMaterialSlotSpec.byProcessEntityId.filter(entityId)]
+    .sort((a: any, b: any) => a.ordinal - b.ordinal);
+}
+
+function loadRecipeProcessUses(tx: any, recipeEntityId: string) {
+  return [...tx.db.RecipeProcessUse.byRecipeEntityId.filter(recipeEntityId)]
+    .sort((a: any, b: any) => a.ordinal - b.ordinal);
+}
+
+function loadRecipeMaterialSpecs(tx: any, recipeEntityId: string) {
+  return [...tx.db.RecipeMaterialSpec.byRecipeEntityId.filter(recipeEntityId)];
+}
+
+function loadRecipeMaterialBindings(tx: any, rpuId: string) {
+  return [...tx.db.RecipeProcessMaterialBinding.byRecipeProcessUseId.filter(rpuId)];
+}
+
+// ── Compatibility projection helpers ────────────────────────────────────────
+
+function projectKojiPresetFromProcess(entity: any, paramMap: Map<string, number | string | boolean>) {
   return {
     id: entity.id,
     name: entity.name,
     isBuiltIn: isSystemOwner(entity.ownerId),
-    stages: stages.map((s: any) => ({
-      name: s.name,
-      ordinal: s.ordinal,
-      riceFrac: s.riceFrac,
-      kojiFrac: s.kojiFrac,
-      waterLPerKg: s.waterLPerKg,
-    })),
+    kojiGPerKgRice: (paramMap.get('koji_g_per_kg_rice') ?? 0) as number,
+    carrier: (paramMap.get('carrier_name') ?? '') as string,
+    carrierRatioGPerG: (paramMap.get('carrier_ratio_g_per_g') ?? 0) as number,
   };
 }
+
+function projectMotoPresetFromProcess(entity: any, paramMap: Map<string, number | string | boolean>) {
+  return {
+    id: entity.id,
+    name: entity.name,
+    isBuiltIn: isSystemOwner(entity.ownerId),
+    riceFrac: (paramMap.get('rice_frac') ?? 0) as number,
+    kojiFrac: (paramMap.get('koji_frac') ?? 0) as number,
+    waterLPerKg: (paramMap.get('water_l_per_kg') ?? 0) as number,
+    yeastPitchRateMPerMl: (paramMap.get('yeast_pitch_rate_m_per_ml') ?? 0) as number,
+    acidRefMlPerL: (paramMap.get('acid_ref_ml_per_l') ?? 0) as number,
+    acidRefStrengthPct: (paramMap.get('acid_ref_strength_pct') ?? 0) as number,
+  };
+}
+
+function projectMoromiPresetFromProcess(entity: any, stages: any[], materialSlots: any[]) {
+  const materialStages = stages
+    .filter((s: any) => s.materialOrdinal != null)
+    .sort((a: any, b: any) => a.materialOrdinal - b.materialOrdinal);
+
+  return {
+    id: entity.id,
+    name: entity.name,
+    isBuiltIn: isSystemOwner(entity.ownerId),
+    stages: materialStages.map((stage: any) => {
+      const stageSlots = materialSlots.filter((s: any) => s.stageSpecId === stage.id);
+      const riceSlot = stageSlots.find((s: any) => s.key === 'rice');
+      const kojiSlot = stageSlots.find((s: any) => s.key === 'koji');
+      const waterSlot = stageSlots.find((s: any) => s.key === 'water');
+      return {
+        name: stage.label,
+        ordinal: stage.materialOrdinal,
+        riceFrac: riceSlot?.quantityValue ?? 0,
+        kojiFrac: kojiSlot?.quantityValue ?? 0,
+        waterLPerKg: waterSlot?.quantityValue ?? 0,
+      };
+    }),
+  };
+}
+
+function projectRecipeAmendmentsCompat(tx: any, processUses: any[]) {
+  const amendments: any[] = [];
+  for (const pu of processUses) {
+    const { process } = loadProcessEntity(tx, pu.processSnapshotEntityId);
+    const bindings = loadRecipeMaterialBindings(tx, pu.id);
+    for (const binding of bindings) {
+      const materialSpec = tx.db.RecipeMaterialSpec.id.find(binding.recipeMaterialSpecId);
+      if (!materialSpec || materialSpec.materialClass.tag !== 'adjunct') continue;
+
+      const slotSpec = tx.db.ProcessMaterialSlotSpec.id.find(binding.processMaterialSlotSpecId);
+      if (!slotSpec) continue;
+
+      const fracOfTotalRice = binding.quantityOverride ?? slotSpec.quantityValue ?? 0;
+
+      let placement: any;
+      if (process.processKind.tag === 'moto') {
+        placement = { where: 'moto' as const };
+      } else {
+        const stage = slotSpec.stageSpecId ? tx.db.ProcessStageSpec.id.find(slotSpec.stageSpecId) : null;
+        placement = { where: 'moromi' as const, stageOrdinal: stage?.materialOrdinal ?? 1 };
+      }
+
+      amendments.push({ kind: materialSpec.label, fracOfTotalRice, placement });
+    }
+  }
+  return amendments;
+}
+
+// ── Shared data loaders ─────────────────────────────────────────────────────
 
 function loadWaterProfile(tx: any, entityId: string | undefined) {
   if (!entityId) return null;
@@ -85,15 +160,13 @@ function loadWaterProfile(tx: any, entityId: string | undefined) {
   };
 }
 
-function loadSchedule(tx: any, methodEntityId: string) {
-  const schedules = [...tx.db.ScheduleTable.byMethodEntityId.filter(methodEntityId)];
+function loadSchedule(tx: any, processEntityId: string) {
+  const schedules = [...tx.db.ScheduleTable.byProcessEntityId.filter(processEntityId)];
   if (schedules.length === 0) return null;
   const schedule = schedules[0];
   const events = [...tx.db.ScheduleEvent.byScheduleId.filter(schedule.id)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
-  // Reassemble events into the old step-based structure.
-  // Milestones become steps; goal/check/action events attach to the preceding milestone.
   const steps: any[] = [];
   let currentStep: any = null;
 
@@ -146,55 +219,49 @@ function loadAllSalts(tx: any) {
   }));
 }
 
-function loadAcid(tx: any, acidId: string | undefined) {
-  if (acidId) {
-    const row = tx.db.AcidType.id.find(acidId);
-    if (row) return { id: row.id, name: row.name, isBuiltIn: true, strengthPct: row.strengthPct, relativeAcidity: row.relativeAcidity };
-  }
+function loadAcid(tx: any) {
   const all = [...tx.db.AcidType.iter()];
   if (all.length === 0) throw new Error('No acid types available');
   return { id: all[0].id, name: all[0].name, isBuiltIn: true, strengthPct: all[0].strengthPct, relativeAcidity: all[0].relativeAcidity };
 }
 
-function loadAmendments(tx: any, recipeEntityId: string) {
-  const rows = [...tx.db.RecipeAmendment.byRecipeEntityId.filter(recipeEntityId)]
-    .sort((a: any, b: any) => a.ordinal - b.ordinal);
-  return rows.map((a: any) => ({
-    kind: a.kind,
-    fracOfTotalRice: a.fracOfTotalRice,
-    placement: a.placementKind.tag === 'moto'
-      ? { where: 'moto' as const }
-      : { where: 'moromi' as const, stageOrdinal: a.stageOrdinal },
-  }));
-}
-
-function resolveRiceVarietyName(tx: any, catalogId: string | undefined): string | undefined {
-  if (!catalogId) return undefined;
-  const row = tx.db.CatalogRiceVariety.id.find(catalogId);
-  return row?.name;
-}
+// ── Bundle builder ──────────────────────────────────────────────────────────
 
 function buildBundle(tx: any, entity: any, recipePayload: any) {
-  const koji = loadKojiMethod(tx, recipePayload.kojiMethodEntityId);
-  const moto = loadMotoMethod(tx, recipePayload.motoMethodEntityId);
-  const moromi = loadMoromiMethod(tx, recipePayload.moromiMethodEntityId);
-  const waterProfile = loadWaterProfile(tx, recipePayload.waterProfileEntityId);
-  const salts = loadAllSalts(tx);
-  const acid = loadAcid(tx, recipePayload.recommendedAcidTypeId);
-  const amendments = loadAmendments(tx, entity.id);
+  const processUses = loadRecipeProcessUses(tx, entity.id);
 
-  const riceVarietyName = resolveRiceVarietyName(tx, recipePayload.recommendedCatalogRiceVarietyId);
+  let kojiData: any, motoData: any, moromiData: any;
+  for (const pu of processUses) {
+    const { entity: procEntity, process } = loadProcessEntity(tx, pu.processSnapshotEntityId);
+    switch (process.processKind.tag) {
+      case 'koji': kojiData = { pu, entity: procEntity }; break;
+      case 'moto': motoData = { pu, entity: procEntity }; break;
+      case 'moromi': moromiData = { pu, entity: procEntity }; break;
+    }
+  }
+  if (!kojiData || !motoData || !moromiData) throw new Error('Recipe missing required processes');
+
+  const kojiParamMap = loadProcessParamMap(tx, kojiData.entity.id);
+  const motoParamMap = loadProcessParamMap(tx, motoData.entity.id);
+  const moromiStages = loadProcessStages(tx, moromiData.entity.id);
+  const moromiSlots = loadProcessMaterialSlots(tx, moromiData.entity.id);
+
+  const koji = projectKojiPresetFromProcess(kojiData.entity, kojiParamMap);
+  const moto = projectMotoPresetFromProcess(motoData.entity, motoParamMap);
+  const moromi = projectMoromiPresetFromProcess(moromiData.entity, moromiStages, moromiSlots);
+  const waterProfile = loadWaterProfile(tx, recipePayload.defaultWaterProfileEntityId);
+  const salts = loadAllSalts(tx);
+  const acid = loadAcid(tx);
+  const amendments = projectRecipeAmendmentsCompat(tx, processUses);
 
   const template = {
     id: entity.id,
     name: entity.name,
-    kojiPresetRef: recipePayload.kojiMethodEntityId,
-    motoPresetRef: recipePayload.motoMethodEntityId,
-    moromiPresetRef: recipePayload.moromiMethodEntityId,
-    waterProfileRef: recipePayload.waterProfileEntityId ?? '',
+    kojiPresetRef: kojiData.pu.processSnapshotEntityId,
+    motoPresetRef: motoData.pu.processSnapshotEntityId,
+    moromiPresetRef: moromiData.pu.processSnapshotEntityId,
+    waterProfileRef: recipePayload.defaultWaterProfileEntityId ?? '',
     amendments,
-    recommendedRiceVariety: riceVarietyName,
-    recommendedPolishPct: recipePayload.recommendedPolishPct,
   };
 
   const presets = {
@@ -207,9 +274,9 @@ function buildBundle(tx: any, entity: any, recipePayload: any) {
   };
 
   const schedules: Record<string, any> = {};
-  const kojiSch = loadSchedule(tx, recipePayload.kojiMethodEntityId);
-  const motoSch = loadSchedule(tx, recipePayload.motoMethodEntityId);
-  const moromiSch = loadSchedule(tx, recipePayload.moromiMethodEntityId);
+  const kojiSch = loadSchedule(tx, kojiData.pu.processSnapshotEntityId);
+  const motoSch = loadSchedule(tx, motoData.pu.processSnapshotEntityId);
+  const moromiSch = loadSchedule(tx, moromiData.pu.processSnapshotEntityId);
   if (kojiSch) schedules.koji = kojiSch;
   if (motoSch) schedules.moto = motoSch;
   if (moromiSch) schedules.moromi = moromiSch;
@@ -281,7 +348,12 @@ export const getMyRecipes = spacetimedb.procedure(
     const recipes = all.filter(
       (e: any) => e.entityKind.tag === 'working' && e.dataType.tag === 'recipe'
     );
-    return JSON.stringify(recipes.map((r: any) => ({
+    // Filter out recipes attached to a batch
+    const unattached = recipes.filter((r: any) => {
+      const payload = tx.db.Recipe.entityId.find(r.id);
+      return !payload?.attachedBatchId;
+    });
+    return JSON.stringify(unattached.map((r: any) => ({
       id: r.id,
       name: r.name,
       description: r.description,
@@ -388,6 +460,7 @@ export const copyRecipeSnapshotToRecipe = spacetimedb.procedure(
     const now = tx.timestamp;
     const senderId = tx.sender.toHexString();
 
+    // Copy Entity
     tx.db.Entity.insert({
       id: newEntityId,
       ownerId: senderId,
@@ -406,30 +479,64 @@ export const copyRecipeSnapshotToRecipe = spacetimedb.procedure(
       updatedAt: now,
     });
 
+    // Copy Recipe
     tx.db.Recipe.insert({
       entityId: newEntityId,
-      kojiMethodEntityId: sourcePayload.kojiMethodEntityId,
-      motoMethodEntityId: sourcePayload.motoMethodEntityId,
-      moromiMethodEntityId: sourcePayload.moromiMethodEntityId,
-      waterProfileEntityId: sourcePayload.waterProfileEntityId,
-      recommendedCatalogRiceVarietyId: sourcePayload.recommendedCatalogRiceVarietyId,
-      recommendedPolishPct: sourcePayload.recommendedPolishPct,
-      recommendedAcidTypeId: sourcePayload.recommendedAcidTypeId,
-      recommendedYeastProductId: sourcePayload.recommendedYeastProductId,
+      defaultWaterProfileEntityId: sourcePayload.defaultWaterProfileEntityId,
+      attachedBatchId: undefined,
+      notes: sourcePayload.notes,
     });
 
-    // Copy amendments
-    const amendments = [...tx.db.RecipeAmendment.byRecipeEntityId.filter(snapshotId)];
-    for (const a of amendments) {
-      tx.db.RecipeAmendment.insert({
-        id: tx.newUuidV4().toString(),
+    // Copy RecipeProcessUse rows with ID remapping
+    const sourceRpus = loadRecipeProcessUses(tx, snapshotId);
+    const rpuIdMap = new Map<string, string>();
+    for (const rpu of sourceRpus) {
+      const newRpuId = tx.newUuidV4().toString();
+      rpuIdMap.set(rpu.id, newRpuId);
+      tx.db.RecipeProcessUse.insert({
+        id: newRpuId,
         recipeEntityId: newEntityId,
-        ordinal: a.ordinal,
-        kind: a.kind,
-        fracOfTotalRice: a.fracOfTotalRice,
-        placementKind: a.placementKind,
-        stageOrdinal: a.stageOrdinal,
+        ordinal: rpu.ordinal,
+        label: rpu.label,
+        processSnapshotEntityId: rpu.processSnapshotEntityId,
+        notes: rpu.notes,
       });
+    }
+
+    // Copy RecipeMaterialSpec rows with ID remapping
+    const sourceRms = loadRecipeMaterialSpecs(tx, snapshotId);
+    const rmsIdMap = new Map<string, string>();
+    for (const rms of sourceRms) {
+      const newRmsId = tx.newUuidV4().toString();
+      rmsIdMap.set(rms.id, newRmsId);
+      tx.db.RecipeMaterialSpec.insert({
+        id: newRmsId,
+        recipeEntityId: newEntityId,
+        key: rms.key,
+        label: rms.label,
+        materialClass: rms.materialClass,
+        defaultUnit: rms.defaultUnit,
+        catalogRefType: rms.catalogRefType,
+        catalogRefId: rms.catalogRefId,
+        customName: rms.customName,
+        notes: rms.notes,
+      });
+    }
+
+    // Copy RecipeProcessMaterialBinding rows with remapped IDs
+    for (const [oldRpuId, newRpuId] of rpuIdMap) {
+      const bindings = loadRecipeMaterialBindings(tx, oldRpuId);
+      for (const b of bindings) {
+        tx.db.RecipeProcessMaterialBinding.insert({
+          id: tx.newUuidV4().toString(),
+          recipeProcessUseId: newRpuId,
+          processMaterialSlotSpecId: b.processMaterialSlotSpecId,
+          recipeMaterialSpecId: rmsIdMap.get(b.recipeMaterialSpecId) ?? b.recipeMaterialSpecId,
+          quantityOverride: b.quantityOverride,
+          quantityUnitOverride: b.quantityUnitOverride,
+          notes: b.notes,
+        });
+      }
     }
 
     return JSON.stringify({ recipeId: newEntityId });
@@ -439,7 +546,7 @@ export const copyRecipeSnapshotToRecipe = spacetimedb.procedure(
 export const createBatch = spacetimedb.procedure(
   { recipeId: t.string(), selections: t.string(), version: t.option(t.string()) },
   t.string(),
-  (ctx, { recipeId, selections: selectionsJson, version }) => ctx.withTx(tx => {
+  (ctx, { recipeId, selections: _selectionsJson, version }) => ctx.withTx(tx => {
     const senderId = tx.sender.toHexString();
     const recipeEntity = tx.db.Entity.id.find(recipeId);
     if (!recipeEntity) throw new Error(`Recipe ${recipeId} not found`);
@@ -449,14 +556,12 @@ export const createBatch = spacetimedb.procedure(
     const recipePayload = tx.db.Recipe.entityId.find(recipeId);
     if (!recipePayload) throw new Error(`Recipe payload ${recipeId} not found`);
 
-    // TODO: parse and apply selections when batch selection fields are implemented
-    // const parsedSelections = JSON.parse(selectionsJson);
     const now = tx.timestamp;
     const snapshotId = tx.newUuidV4().toString();
     const batchId = tx.newUuidV4().toString();
     const snapshotVersion = version ?? '1.0.0';
 
-    // Create snapshot entity (copy of working recipe)
+    // Create snapshot entity
     tx.db.Entity.insert({
       id: snapshotId,
       ownerId: senderId,
@@ -475,40 +580,75 @@ export const createBatch = spacetimedb.procedure(
       updatedAt: now,
     });
 
-    // Copy recipe payload
+    // Copy Recipe payload
     tx.db.Recipe.insert({
       entityId: snapshotId,
-      kojiMethodEntityId: recipePayload.kojiMethodEntityId,
-      motoMethodEntityId: recipePayload.motoMethodEntityId,
-      moromiMethodEntityId: recipePayload.moromiMethodEntityId,
-      waterProfileEntityId: recipePayload.waterProfileEntityId,
-      recommendedCatalogRiceVarietyId: recipePayload.recommendedCatalogRiceVarietyId,
-      recommendedPolishPct: recipePayload.recommendedPolishPct,
-      recommendedAcidTypeId: recipePayload.recommendedAcidTypeId,
-      recommendedYeastProductId: recipePayload.recommendedYeastProductId,
+      defaultWaterProfileEntityId: recipePayload.defaultWaterProfileEntityId,
+      attachedBatchId: batchId,
+      notes: recipePayload.notes,
     });
 
-    // Copy amendments
-    const amendments = [...tx.db.RecipeAmendment.byRecipeEntityId.filter(recipeId)];
-    for (const a of amendments) {
-      tx.db.RecipeAmendment.insert({
-        id: tx.newUuidV4().toString(),
+    // Copy RecipeProcessUse rows
+    const sourceRpus = loadRecipeProcessUses(tx, recipeId);
+    const rpuIdMap = new Map<string, string>();
+    for (const rpu of sourceRpus) {
+      const newRpuId = tx.newUuidV4().toString();
+      rpuIdMap.set(rpu.id, newRpuId);
+      tx.db.RecipeProcessUse.insert({
+        id: newRpuId,
         recipeEntityId: snapshotId,
-        ordinal: a.ordinal,
-        kind: a.kind,
-        fracOfTotalRice: a.fracOfTotalRice,
-        placementKind: a.placementKind,
-        stageOrdinal: a.stageOrdinal,
+        ordinal: rpu.ordinal,
+        label: rpu.label,
+        processSnapshotEntityId: rpu.processSnapshotEntityId,
+        notes: rpu.notes,
       });
     }
 
-    // Create batch (selection/override fields TBD)
+    // Copy RecipeMaterialSpec rows
+    const sourceRms = loadRecipeMaterialSpecs(tx, recipeId);
+    const rmsIdMap = new Map<string, string>();
+    for (const rms of sourceRms) {
+      const newRmsId = tx.newUuidV4().toString();
+      rmsIdMap.set(rms.id, newRmsId);
+      tx.db.RecipeMaterialSpec.insert({
+        id: newRmsId,
+        recipeEntityId: snapshotId,
+        key: rms.key,
+        label: rms.label,
+        materialClass: rms.materialClass,
+        defaultUnit: rms.defaultUnit,
+        catalogRefType: rms.catalogRefType,
+        catalogRefId: rms.catalogRefId,
+        customName: rms.customName,
+        notes: rms.notes,
+      });
+    }
+
+    // Copy RecipeProcessMaterialBinding rows
+    for (const [oldRpuId, newRpuId] of rpuIdMap) {
+      const bindings = loadRecipeMaterialBindings(tx, oldRpuId);
+      for (const b of bindings) {
+        tx.db.RecipeProcessMaterialBinding.insert({
+          id: tx.newUuidV4().toString(),
+          recipeProcessUseId: newRpuId,
+          processMaterialSlotSpecId: b.processMaterialSlotSpecId,
+          recipeMaterialSpecId: rmsIdMap.get(b.recipeMaterialSpecId) ?? b.recipeMaterialSpecId,
+          quantityOverride: b.quantityOverride,
+          quantityUnitOverride: b.quantityUnitOverride,
+          notes: b.notes,
+        });
+      }
+    }
+
+    // Create batch
     tx.db.Batch.insert({
       id: batchId,
       ownerId: senderId,
       recipeSnapshotEntityId: snapshotId,
       name: recipeEntity.name,
       status: { tag: 'planned' },
+      targetKind: { tag: 'total_rice_kg' },
+      targetValue: 5.5,
       startedAt: undefined,
       completedAt: undefined,
       notes: undefined,
@@ -530,16 +670,24 @@ export const deleteRecipe = spacetimedb.reducer(
     if (entity.ownerId !== ctx.sender.toHexString()) throw new Error('Not the owner');
     if (entity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
 
-    // Delete children
-    const amendments = [...ctx.db.RecipeAmendment.byRecipeEntityId.filter(recipeId)];
-    for (const a of amendments) {
-      ctx.db.RecipeAmendment.id.delete(a.id);
+    // Delete bindings for each RPU
+    const rpus = [...ctx.db.RecipeProcessUse.byRecipeEntityId.filter(recipeId)];
+    for (const rpu of rpus) {
+      const bindings = [...ctx.db.RecipeProcessMaterialBinding.byRecipeProcessUseId.filter(rpu.id)];
+      for (const b of bindings) {
+        ctx.db.RecipeProcessMaterialBinding.id.delete(b.id);
+      }
+      ctx.db.RecipeProcessUse.id.delete(rpu.id);
     }
 
-    // Delete payload
-    ctx.db.Recipe.entityId.delete(recipeId);
+    // Delete material specs
+    const specs = [...ctx.db.RecipeMaterialSpec.byRecipeEntityId.filter(recipeId)];
+    for (const s of specs) {
+      ctx.db.RecipeMaterialSpec.id.delete(s.id);
+    }
 
-    // Delete entity
+    // Delete payload and entity
+    ctx.db.Recipe.entityId.delete(recipeId);
     ctx.db.Entity.id.delete(recipeId);
   }
 );
@@ -547,290 +695,5 @@ export const deleteRecipe = spacetimedb.reducer(
 // ── Seed demo data ──────────────────────────────────────────────────────────
 
 export const seedDemoData = spacetimedb.reducer(
-  (ctx) => {
-    const now = ctx.timestamp;
-    const systemOwner = '__system__';
-
-    // ── 1. Catalog entries ──────────────────────────────────────────────────
-
-    // Rice varieties
-    const riceYamada = 'cat-rice-yamadanishiki';
-    if (!ctx.db.CatalogRiceVariety.id.find(riceYamada)) {
-      ctx.db.CatalogRiceVariety.insert({ id: riceYamada, name: 'Yamadanishiki', region: 'Hyogo', description: undefined });
-    }
-    const riceGohyaku = 'cat-rice-gohyakumangoku';
-    if (!ctx.db.CatalogRiceVariety.id.find(riceGohyaku)) {
-      ctx.db.CatalogRiceVariety.insert({ id: riceGohyaku, name: 'Gohyakumangoku', region: 'Niigata', description: undefined });
-    }
-
-    // Yeast products
-    const yeastWl707 = 'cat-yeast-wl707';
-    if (!ctx.db.CatalogYeastProduct.id.find(yeastWl707)) {
-      ctx.db.CatalogYeastProduct.insert({ id: yeastWl707, name: 'WL707', format: { tag: 'liquid_pouch' }, supplier: 'White Labs', description: undefined });
-    }
-    const yeastK7 = 'cat-yeast-k7-dry';
-    if (!ctx.db.CatalogYeastProduct.id.find(yeastK7)) {
-      ctx.db.CatalogYeastProduct.insert({ id: yeastK7, name: 'K7 Dry', format: { tag: 'dry' }, supplier: undefined, description: undefined });
-    }
-
-    // Koji spore products
-    const sporeA1 = 'cat-koji-konno-a1';
-    if (!ctx.db.CatalogKojiSporeProduct.id.find(sporeA1)) {
-      ctx.db.CatalogKojiSporeProduct.insert({ id: sporeA1, name: 'Akita Konno A-1', supplier: undefined, description: undefined });
-    }
-    const sporeHishi = 'cat-koji-hishiroku';
-    if (!ctx.db.CatalogKojiSporeProduct.id.find(sporeHishi)) {
-      ctx.db.CatalogKojiSporeProduct.insert({ id: sporeHishi, name: 'Hishiroku Moyashi', supplier: undefined, description: undefined });
-    }
-
-    // Acid types
-    const acidId = 'acid-lactic-88';
-    if (!ctx.db.AcidType.id.find(acidId)) {
-      ctx.db.AcidType.insert({ id: acidId, name: 'Lactic 88%', strengthPct: 88, relativeAcidity: 1.0 });
-    }
-
-    // Mineral salts
-    const salts = [
-      { id: 'salt-mgso4', name: 'MgSO4·7H2O (Epsom Salt)', primaryIon: 'Mg', ions: [{ ionSymbol: 'Mg', massGPerGSalt: 24.31 / 246.47 }, { ionSymbol: 'SO4', massGPerGSalt: 96.06 / 246.47 }] },
-      { id: 'salt-nacl', name: 'NaCl (Table Salt)', primaryIon: 'Na', ions: [{ ionSymbol: 'Na', massGPerGSalt: 22.99 / 58.44 }, { ionSymbol: 'Cl', massGPerGSalt: 35.45 / 58.44 }] },
-      { id: 'salt-kh2po4', name: 'KH2PO4 (Monopotassium Phosphate)', primaryIon: 'PO4', ions: [{ ionSymbol: 'K', massGPerGSalt: 39.10 / 136.09 }, { ionSymbol: 'PO4', massGPerGSalt: 94.97 / 136.09 }] },
-      { id: 'salt-caso4', name: 'CaSO4 (Gypsum)', primaryIon: 'Ca', ions: [{ ionSymbol: 'Ca', massGPerGSalt: 40.08 / 136.14 }, { ionSymbol: 'SO4', massGPerGSalt: 96.06 / 136.14 }] },
-      { id: 'salt-cacl2', name: 'CaCl2 (Calcium Chloride)', primaryIon: 'Ca', ions: [{ ionSymbol: 'Ca', massGPerGSalt: 40.08 / 110.98 }, { ionSymbol: 'Cl', massGPerGSalt: 70.90 / 110.98 }] },
-      { id: 'salt-kcl', name: 'KCl (Potassium Chloride)', primaryIon: 'K', ions: [{ ionSymbol: 'K', massGPerGSalt: 39.10 / 74.55 }, { ionSymbol: 'Cl', massGPerGSalt: 35.45 / 74.55 }] },
-      { id: 'salt-k2so4', name: 'K2SO4 (Potassium Sulfate)', primaryIon: 'K', ions: [{ ionSymbol: 'K', massGPerGSalt: 78.20 / 174.26 }, { ionSymbol: 'SO4', massGPerGSalt: 96.06 / 174.26 }] },
-    ];
-
-    for (const salt of salts) {
-      if (!ctx.db.MineralSalt.id.find(salt.id)) {
-        ctx.db.MineralSalt.insert({ id: salt.id, name: salt.name, primaryIon: salt.primaryIon });
-        for (const ion of salt.ions) {
-          ctx.db.MineralSaltIon.insert({
-            id: ctx.newUuidV4().toString(),
-            saltId: salt.id,
-            ionSymbol: ion.ionSymbol,
-            massGPerGSalt: ion.massGPerGSalt,
-          });
-        }
-      }
-    }
-
-    // ── 2. Water profile entity ─────────────────────────────────────────────
-
-    const waterEntityId = 'ent-water-ginjo-1';
-    if (!ctx.db.Entity.id.find(waterEntityId)) {
-      ctx.db.Entity.insert({
-        id: waterEntityId, ownerId: systemOwner,
-        dataType: { tag: 'water_profile' }, entityKind: { tag: 'snapshot' },
-        name: 'Ginjo 1', description: undefined, version: '1.0.0',
-        isPublic: true, isArchived: false,
-        lineageRootId: waterEntityId, parentEntityId: undefined,
-        provenanceKind: { tag: 'original' }, provenanceEntityId: undefined,
-        createdAt: now, updatedAt: now,
-      });
-      ctx.db.WaterProfile.insert({ entityId: waterEntityId, notes: undefined });
-      ctx.db.WaterProfileIon.insert({ id: ctx.newUuidV4().toString(), waterProfileEntityId: waterEntityId, ionSymbol: 'Ca', targetPpm: 10 });
-      ctx.db.WaterProfileIon.insert({ id: ctx.newUuidV4().toString(), waterProfileEntityId: waterEntityId, ionSymbol: 'Mg', targetPpm: 3 });
-    }
-
-    // ── 3. Method entities ──────────────────────────────────────────────────
-
-    // Koji method
-    const kojiEntityId = 'ent-method-koji-ueda';
-    if (!ctx.db.Entity.id.find(kojiEntityId)) {
-      ctx.db.Entity.insert({
-        id: kojiEntityId, ownerId: systemOwner,
-        dataType: { tag: 'koji_method' }, entityKind: { tag: 'snapshot' },
-        name: 'Ueda Koji Method', description: undefined, version: '1.0.0',
-        isPublic: true, isArchived: false,
-        lineageRootId: kojiEntityId, parentEntityId: undefined,
-        provenanceKind: { tag: 'original' }, provenanceEntityId: undefined,
-        createdAt: now, updatedAt: now,
-      });
-      ctx.db.KojiMethod.insert({
-        entityId: kojiEntityId, kojiGPerKgRice: 0.08,
-        carrierName: 'Toasted Rice Flour', carrierRatioGPerG: 5,
-      });
-
-      // Koji schedule
-      const kojiSchedId = ctx.newUuidV4().toString();
-      ctx.db.ScheduleTable.insert({ id: kojiSchedId, methodEntityId: kojiEntityId, workflowKind: { tag: 'koji' }, name: 'Ueda Koji Schedule' });
-
-      const kojiSteps = [
-        { label: 'Soak + Drain Rest', atH: 0, durationH: 4, goals: ['Target 29–32% weight gain by end of soak/drain period'], checks: [] as string[], actions: ['Soak rice to target absorption, drain, then rest to allow moisture to distribute evenly'] },
-        { label: 'Steam Rice', atH: 4, durationH: 1, goals: ['Target 42–43% post-steam weight gain (40–44% acceptable)'], checks: [] as string[], actions: ['Steam thoroughly until grains are evenly gelatinized through the center'] },
-        { label: 'Hiki-komi / Drying', atH: 5, durationH: 3, goals: ['Dry rice down to 28–31% weight gain before inoculation', 'For a first run with a new rice, aim for 29–30%'], checks: ['Keep rice spread out for even drying', 'Use ~37–40°C chamber heat; up to 45°C is acceptable in an oven', 'Avoid prolonged exposure above 50°C'], actions: ['Dry steamed rice on racks in a warm, ventilated chamber or low-temp oven until target weight is reached'] },
-        { label: 'Tane-kiri / Inoculation', atH: 8, durationH: undefined as number | undefined, goals: ['Rice will typically end around 29–30% after tane-kiri'], checks: ['Rice must be at or below 40°C before inoculation', 'Distribute spores as evenly as possible'], actions: ['Measure and dilute starter as needed, then shake evenly over rice while breaking up clumps and turning rice'] },
-        { label: 'Momi-age / Germination', atH: 8, durationH: 18, goals: ['Chamber target: 32°C', 'Koji target at start: 32°C', 'Expected weight ratio: 28–29%'], checks: ['Use sanitized tubs with lids loosely placed to retain rice moisture', 'Do not add extra humidity to the chamber'], actions: ['Divide rice into tubs, record weights, loosely cover, and hold at 32°C for germination'] },
-        { label: 'Mori / Heaping', atH: 26, durationH: 6, goals: ['Weight should remain stable, with less than 0.5% drop', 'Koji temp target at start: 32.5–34°C', 'Chamber target: 32°C'], checks: ['Proceed to naka when surface haze reaches roughly 10–20%'], actions: ['Break up any clumps, stir lightly, record weight, and crack lid slightly for oxygen'] },
-        { label: 'Naka-shigoto / Middle Work', atH: 32, durationH: 6, goals: ['Weight should remain stable, with less than 0.5% drop', 'Koji temp target at start: 34–35°C', 'Chamber target: 33–34°C'], checks: ['Proceed to shimai when surface haze reaches roughly 30–40%'], actions: ['Mix lightly, break up clumps so grains are loose again, and record weight'] },
-        { label: 'Shimai-shigoto / Final Work', atH: 38, durationH: undefined as number | undefined, goals: ['Ideal timing is around 38.5°C koji temperature', 'Koji temp target at start: 38–39°C', 'Chamber target: 35–36°C'], checks: ['Once koji reaches 40°C, or at shimai, remove lid and cover tub with a clean dry cotton towel'], actions: ['Mix thoroughly so grains are separated, record weight, then transition from lid to dry towel cover'] },
-        { label: 'Peak Temperature Hold', atH: 42, durationH: undefined as number | undefined, goals: ['Target peak koji temperature: 40–41°C for a typical batch', 'Acceptable overall peak range: 40–43°C depending on strain and goals', 'Maintain near peak until de-koji'], checks: ['Start de-koji timing once peak temperature is reached', 'If temperature overshoots, mix and/or lower chamber by 1–2°C', 'Do not remove towel during correction or rice may dry too quickly'], actions: ['Hold near peak temperature and monitor for stability'] },
-        { label: 'De-koji', atH: 50, durationH: undefined as number | undefined, goals: ['Typical finish is 48–50 hours from tane-kiri', 'Final weight ratio often lands around 13–17%, though 10–20% is acceptable'], checks: ['Usually finish 10–18 hours after peak temperature is reached', 'Cool in a dry place or fridge, but do not seal immediately to avoid condensation'], actions: ['Remove koji from chamber, record final weight, and cool gradually'] },
-      ];
-
-      let ord = 0;
-      for (const step of kojiSteps) {
-        ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: kojiSchedId, ordinal: ord++, kind: { tag: 'milestone' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: step.label, description: undefined, durationH: step.durationH, note: undefined });
-        for (const g of step.goals) {
-          ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: kojiSchedId, ordinal: ord++, kind: { tag: 'goal' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: g, description: g, durationH: undefined, note: undefined });
-        }
-        for (const c of step.checks) {
-          ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: kojiSchedId, ordinal: ord++, kind: { tag: 'check' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: c, description: c, durationH: undefined, note: undefined });
-        }
-        for (const a of step.actions) {
-          ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: kojiSchedId, ordinal: ord++, kind: { tag: 'action' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: a, description: a, durationH: undefined, note: undefined });
-        }
-      }
-    }
-
-    // Moto method
-    const motoEntityId = 'ent-method-moto-sokujo';
-    if (!ctx.db.Entity.id.find(motoEntityId)) {
-      ctx.db.Entity.insert({
-        id: motoEntityId, ownerId: systemOwner,
-        dataType: { tag: 'moto_method' }, entityKind: { tag: 'snapshot' },
-        name: 'Sokujo Moto Method', description: undefined, version: '1.0.0',
-        isPublic: true, isArchived: false,
-        lineageRootId: motoEntityId, parentEntityId: undefined,
-        provenanceKind: { tag: 'original' }, provenanceEntityId: undefined,
-        createdAt: now, updatedAt: now,
-      });
-      ctx.db.MotoMethod.insert({
-        entityId: motoEntityId,
-        riceFrac: 0.07, kojiFrac: 0.3, waterLPerKg: 1.07,
-        yeastPitchRateMPerMl: 3, acidRefMlPerL: 0.03, acidRefStrengthPct: 88,
-      });
-
-      // Moto schedule
-      const motoSchedId = ctx.newUuidV4().toString();
-      ctx.db.ScheduleTable.insert({ id: motoSchedId, methodEntityId: motoEntityId, workflowKind: { tag: 'moto' }, name: 'Sokujo Moto Schedule' });
-
-      const motoSteps = [
-        { label: 'Prepare Moto Water', atH: 0, durationH: 1, goals: ['Water treated and at target temperature'], checks: [] as string[], actions: ['Measure water, add mineral salts and lactic acid, mix thoroughly'] },
-        { label: 'Combine Koji, Water, and Yeast', atH: 1, durationH: undefined as number | undefined, goals: ['Koji hydrated and yeast pitched'], checks: [] as string[], actions: ['Add koji to treated water, stir to break up clumps', 'Pitch yeast into the mixture'] },
-        { label: 'Add Kake Rice', atH: 2, durationH: undefined as number | undefined, goals: ['Steamed kake rice incorporated into moto'], checks: [] as string[], actions: ['Add cooled steamed rice, mix evenly into koji-water mixture'] },
-        { label: 'Fermentation', atH: 2, durationH: 336, goals: ['Active fermentation with yeast propagation'], checks: ['Stir once or twice daily for the first few days', 'Monitor temperature and aroma for healthy fermentation signs'], actions: [] as string[] },
-        { label: 'Moto Ready', atH: 338, durationH: undefined as number | undefined, goals: ['Moto is mature and ready for moromi build'], checks: ['Confirm healthy yeast population before proceeding to soe'], actions: [] as string[] },
-      ];
-
-      let ord = 0;
-      for (const step of motoSteps) {
-        ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: motoSchedId, ordinal: ord++, kind: { tag: 'milestone' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: step.label, description: undefined, durationH: step.durationH, note: undefined });
-        for (const g of step.goals) {
-          ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: motoSchedId, ordinal: ord++, kind: { tag: 'goal' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: g, description: g, durationH: undefined, note: undefined });
-        }
-        for (const c of step.checks) {
-          ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: motoSchedId, ordinal: ord++, kind: { tag: 'check' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: c, description: c, durationH: undefined, note: undefined });
-        }
-        for (const a of step.actions) {
-          ctx.db.ScheduleEvent.insert({ id: ctx.newUuidV4().toString(), scheduleId: motoSchedId, ordinal: ord++, kind: { tag: 'action' }, timingKind: { tag: 'absolute' }, hoursFromStart: step.atH, stageOrdinal: undefined, offsetHours: undefined, label: a, description: a, durationH: undefined, note: undefined });
-        }
-      }
-    }
-
-    // Moromi method
-    const moromiEntityId = 'ent-method-moromi-sandan';
-    if (!ctx.db.Entity.id.find(moromiEntityId)) {
-      ctx.db.Entity.insert({
-        id: moromiEntityId, ownerId: systemOwner,
-        dataType: { tag: 'moromi_method' }, entityKind: { tag: 'snapshot' },
-        name: 'Sandan Moromi Method', description: undefined, version: '1.0.0',
-        isPublic: true, isArchived: false,
-        lineageRootId: moromiEntityId, parentEntityId: undefined,
-        provenanceKind: { tag: 'original' }, provenanceEntityId: undefined,
-        createdAt: now, updatedAt: now,
-      });
-      ctx.db.MoromiMethod.insert({ entityId: moromiEntityId, notes: undefined });
-      ctx.db.MoromiStage.insert({ id: ctx.newUuidV4().toString(), moromiMethodEntityId: moromiEntityId, ordinal: 1, name: 'Soe', riceFrac: 0.15, kojiFrac: 0.28, waterLPerKg: 0.92 });
-      ctx.db.MoromiStage.insert({ id: ctx.newUuidV4().toString(), moromiMethodEntityId: moromiEntityId, ordinal: 2, name: 'Naka', riceFrac: 0.3, kojiFrac: 0.21, waterLPerKg: 1.2 });
-      ctx.db.MoromiStage.insert({ id: ctx.newUuidV4().toString(), moromiMethodEntityId: moromiEntityId, ordinal: 3, name: 'Tome', riceFrac: 0.48, kojiFrac: 0.21, waterLPerKg: 1.2 });
-    }
-
-    // ── 4. Inventory entries ────────────────────────────────────────────────
-
-    const invOwner = systemOwner;
-
-    const riceLots = [
-      { id: 'inv-lot-yamada-60', catId: riceYamada, polishPct: 60, lotLabel: 'Lot A' },
-      { id: 'inv-lot-yamada-70', catId: riceYamada, polishPct: 70, lotLabel: 'Lot B' },
-      { id: 'inv-lot-gohyaku-50', catId: riceGohyaku, polishPct: 50, lotLabel: 'Lot C' },
-    ];
-    for (const lot of riceLots) {
-      if (!ctx.db.InventoryRiceLot.id.find(lot.id)) {
-        ctx.db.InventoryRiceLot.insert({
-          id: lot.id, ownerId: invOwner,
-          catalogRiceVarietyId: lot.catId, customVarietyName: undefined,
-          polishPct: lot.polishPct, lotLabel: lot.lotLabel,
-          massKgAvailable: undefined, createdAt: now, updatedAt: now,
-        });
-      }
-    }
-
-    const kojiSpores = [
-      { id: 'inv-koji-konno-a1', catId: sporeA1 },
-      { id: 'inv-koji-hishiroku', catId: sporeHishi },
-    ];
-    for (const spore of kojiSpores) {
-      if (!ctx.db.InventoryKojiSporeLot.id.find(spore.id)) {
-        ctx.db.InventoryKojiSporeLot.insert({
-          id: spore.id, ownerId: invOwner,
-          catalogKojiSporeProductId: spore.catId, customName: undefined,
-          createdAt: now, updatedAt: now,
-        });
-      }
-    }
-
-    const yeastStocks = [
-      { id: 'inv-yeast-wl707', catId: yeastWl707 },
-      { id: 'inv-yeast-k7-dry', catId: yeastK7 },
-    ];
-    for (const stock of yeastStocks) {
-      if (!ctx.db.InventoryYeastStock.id.find(stock.id)) {
-        ctx.db.InventoryYeastStock.insert({
-          id: stock.id, ownerId: invOwner,
-          catalogYeastProductId: stock.catId, customName: undefined,
-          format: undefined, createdAt: now, updatedAt: now,
-        });
-      }
-    }
-
-    // ── 5. Recipe snapshot entity (public library entry) ────────────────────
-
-    const recipeSnapshotId = 'ent-recipe-sakura-ginjo-snap';
-    if (!ctx.db.Entity.id.find(recipeSnapshotId)) {
-      ctx.db.Entity.insert({
-        id: recipeSnapshotId, ownerId: systemOwner,
-        dataType: { tag: 'recipe' }, entityKind: { tag: 'snapshot' },
-        name: 'Sakura Ginjo',
-        description: 'A light ginjo-style sake with delicate sakura petal additions during soe. Uses sokujo moto with sandan moromi build and soft ginjo water profile.',
-        version: '1.0.0',
-        isPublic: true, isArchived: false,
-        lineageRootId: recipeSnapshotId, parentEntityId: undefined,
-        provenanceKind: { tag: 'original' }, provenanceEntityId: undefined,
-        createdAt: now, updatedAt: now,
-      });
-
-      ctx.db.Recipe.insert({
-        entityId: recipeSnapshotId,
-        kojiMethodEntityId: kojiEntityId,
-        motoMethodEntityId: motoEntityId,
-        moromiMethodEntityId: moromiEntityId,
-        waterProfileEntityId: waterEntityId,
-        recommendedCatalogRiceVarietyId: riceYamada,
-        recommendedPolishPct: 60,
-        recommendedAcidTypeId: acidId,
-        recommendedYeastProductId: undefined,
-      });
-
-      ctx.db.RecipeAmendment.insert({
-        id: ctx.newUuidV4().toString(),
-        recipeEntityId: recipeSnapshotId,
-        ordinal: 1,
-        kind: 'Sakura Petals',
-        fracOfTotalRice: 0.0005,
-        placementKind: { tag: 'moromi_stage' },
-        stageOrdinal: 1,
-      });
-    }
-  }
+  (ctx) => { seedDemoDataFn(ctx); }
 );
