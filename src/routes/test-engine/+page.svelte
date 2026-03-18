@@ -25,6 +25,13 @@
 	});
 </script>
 
+<nav class="flex gap-3 border-b px-4 py-2 text-xs text-muted-foreground">
+	<span class="font-semibold text-foreground">Engine</span>
+	<a href="/test-processes" class="hover:text-foreground">Processes</a>
+	<a href="/test-plan" class="hover:text-foreground">Plan</a>
+	<a href="/test-schedule" class="hover:text-foreground">Schedule</a>
+</nav>
+
 <div class="mx-auto max-w-6xl p-4">
   <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
     <div>
