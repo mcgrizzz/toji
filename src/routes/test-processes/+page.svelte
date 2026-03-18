@@ -4,9 +4,21 @@
 	const { recipeName, recipeDescription, processSources, snapshots } = testProcessFixture;
 
 	let selectedIndex = $state(0);
+	let selectedStageId = $state<string | null>(null);
 
 	const selectedSource = $derived(processSources[selectedIndex]);
 	const selectedSnapshot = $derived(snapshots[selectedSource.processSnapshotEntityId]);
+	const sortedStages = $derived(stagesFor(selectedSnapshot));
+	const visibleStages = $derived(
+		selectedStageId === null
+			? sortedStages
+			: sortedStages.filter((s) => s.id === selectedStageId)
+	);
+
+	$effect(() => {
+		selectedIndex;
+		selectedStageId = null;
+	});
 
 	function stagesFor(snapshot: typeof selectedSnapshot) {
 		return [...snapshot.stages].sort((a, b) => a.ordinal - b.ordinal);
@@ -47,94 +59,188 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl p-4 font-mono text-sm">
-	<h1 class="text-lg font-semibold">Recipe: {recipeName}</h1>
-	<p class="text-muted-foreground text-xs">{recipeDescription}</p>
+<div class="flex h-screen overflow-hidden font-mono text-sm">
+	<!-- Sidebar -->
+	<aside
+		class="bg-sidebar text-sidebar-foreground flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border"
+	>
+		<!-- Recipe header -->
+		<div class="border-b border-border p-4">
+			<h1 class="text-sm font-semibold">{recipeName}</h1>
+			<p class="text-muted-foreground mt-1 text-xs">{recipeDescription}</p>
+		</div>
 
-	<section class="mt-6">
-		<h2 class="text-sm font-semibold">Processes</h2>
-		<div class="mt-2 flex gap-2">
-			{#each processSources as src, i}
+		<!-- Process list -->
+		<div class="border-b border-border p-3">
+			<h2 class="text-muted-foreground mb-2 text-[10px] font-semibold uppercase tracking-wider">
+				Processes
+			</h2>
+			<div class="flex flex-col gap-1">
+				{#each processSources as src, i}
+					<button
+						type="button"
+						class="w-full rounded px-3 py-1.5 text-left text-xs transition-colors {i ===
+						selectedIndex
+							? 'bg-sidebar-accent font-semibold'
+							: 'hover:bg-sidebar-accent/50'}"
+						onclick={() => (selectedIndex = i)}
+					>
+						{src.ordinal}. {src.label}
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Stage list -->
+		<div class="flex-1 overflow-y-auto p-3">
+			<h2 class="text-muted-foreground mb-2 text-[10px] font-semibold uppercase tracking-wider">
+				Stages
+			</h2>
+			<div class="flex flex-col gap-1">
 				<button
 					type="button"
-					class="rounded border px-3 py-1 text-xs {i === selectedIndex
-						? 'border-foreground bg-foreground/10 font-bold'
-						: 'border-border hover:bg-muted'}"
-					onclick={() => (selectedIndex = i)}
+					class="w-full rounded px-3 py-1.5 text-left text-xs transition-colors {selectedStageId ===
+					null
+						? 'bg-sidebar-accent font-semibold'
+						: 'hover:bg-sidebar-accent/50'}"
+					onclick={() => (selectedStageId = null)}
 				>
-					{src.ordinal}. {src.label}
+					All stages
 				</button>
-			{/each}
+				{#each sortedStages as stage}
+					<button
+						type="button"
+						class="w-full rounded px-3 py-1.5 text-left text-xs transition-colors {selectedStageId ===
+						stage.id
+							? 'bg-sidebar-accent font-semibold'
+							: 'hover:bg-sidebar-accent/50'}"
+						onclick={() => (selectedStageId = stage.id)}
+					>
+						{stage.ordinal}. {stage.label}
+					</button>
+				{/each}
+			</div>
 		</div>
-	</section>
+	</aside>
 
-	<section class="mt-6 rounded-lg border p-4">
-		<h2 class="font-semibold">
-			{selectedSnapshot.name}
-			<span class="text-muted-foreground font-normal">({selectedSnapshot.processKind})</span>
-		</h2>
+	<!-- Main panel -->
+	<main class="flex-1 overflow-y-auto p-6">
+		<!-- Process header -->
+		<div class="mb-6">
+			<h2 class="text-lg font-semibold">{selectedSnapshot.name}</h2>
+			<div class="text-muted-foreground mt-1 flex items-baseline gap-3 text-xs">
+				<span>{selectedSnapshot.processKind}</span>
+				<span class="text-[10px] opacity-60">id={selectedSource.processSnapshotEntityId}</span>
+			</div>
+		</div>
 
-		{#each stagesFor(selectedSnapshot) as stage}
-			<div class="mt-4 border-l-2 border-foreground/20 pl-4">
-				<h3 class="font-semibold">
-					Stage {stage.ordinal}: {stage.label}
-					<span class="text-muted-foreground text-xs font-normal">key={stage.key}</span>
-				</h3>
+		<!-- Stage cards -->
+		{#each visibleStages as stage}
+			<div class="bg-card mb-4 rounded-lg border p-4">
+				<div class="flex items-baseline justify-between">
+					<h3 class="font-semibold">
+						Stage {stage.ordinal}: {stage.label}
+						<span class="text-muted-foreground ml-2 text-xs font-normal">key={stage.key}</span>
+					</h3>
+					<span class="text-muted-foreground text-[10px] opacity-60">id={stage.id}</span>
+				</div>
 
+				<!-- Material slots -->
 				{#if materialsForStage(stage.id).length > 0}
-					<div class="mt-2">
-						<h4 class="text-muted-foreground text-xs font-semibold uppercase">Material Slots</h4>
-						<ul class="mt-1 space-y-0.5">
+					<div class="mt-3">
+						<h4
+							class="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wider"
+						>
+							Material Slots
+						</h4>
+						<div class="space-y-1">
 							{#each materialsForStage(stage.id) as mat}
-								<li class="text-xs">
-									{mat.ordinal}. <strong>{mat.label}</strong> — {mat.materialClass} / {mat.quantityMode}
+								<div class="flex items-baseline gap-2 text-xs">
+									<span class="text-muted-foreground w-4 shrink-0 text-right"
+										>{mat.ordinal}.</span
+									>
+									<span class="font-medium">{mat.label}</span>
+									<span class="text-muted-foreground">—</span>
+									<span class="text-muted-foreground">{mat.materialClass}</span>
+									<span class="text-muted-foreground">/</span>
+									<span class="text-muted-foreground">{mat.quantityMode}</span>
 									{#if mat.quantityValue !== undefined}
-										{mat.quantityValue}{mat.quantityUnit ?? ''}
+										<span class="ml-auto tabular-nums"
+											>{mat.quantityValue}{mat.quantityUnit ?? ''}</span
+										>
 									{/if}
-								</li>
+								</div>
 							{/each}
-						</ul>
+						</div>
 					</div>
 				{/if}
 
+				<!-- Substages -->
 				{#each substagesToStage(stage.id) as substage}
-					<div class="mt-3 ml-4">
+					<div class="mt-4 ml-2">
 						<h4 class="text-xs font-semibold">
 							Substage {substage.ordinal}: {substage.label}
-							<span class="text-muted-foreground font-normal">key={substage.key}</span>
+							<span class="text-muted-foreground ml-1 font-normal">key={substage.key}</span>
+							<span class="text-muted-foreground ml-1 text-[10px] opacity-60"
+								>id={substage.id}</span
+							>
 						</h4>
 
+						<!-- Steps -->
 						{#each stepsForSubstage(substage.id) as step}
-							<div class="mt-2 ml-4 rounded border border-dashed p-2">
-								<div class="text-xs font-semibold">
-									Step {step.ordinal}: {step.label}
+							<div class="bg-muted/20 mt-2 ml-4 rounded-md border p-3">
+								<div class="flex items-baseline justify-between">
+									<div class="text-xs font-semibold">
+										Step {step.ordinal}: {step.label}
+									</div>
+									<span class="text-muted-foreground text-[10px] opacity-60"
+										>id={step.id}</span
+									>
 								</div>
 								<div class="text-muted-foreground mt-1 text-xs">
-									instruction: {step.instructionTemplate}
+									{step.instructionTemplate}
 								</div>
-								<div class="text-muted-foreground text-xs">
-									checkable: {step.isCheckable}
+								<div class="text-muted-foreground mt-0.5 flex gap-2 text-xs">
+									<span>checkable: {step.isCheckable}</span>
 									{#if step.scheduledOffsetH !== undefined}
-										&middot; offset: {step.scheduledOffsetH}h
+										<span>&middot; offset: {step.scheduledOffsetH}h</span>
 									{/if}
 									{#if step.durationH !== undefined}
-										&middot; duration: {step.durationH}h
+										<span>&middot; duration: {step.durationH}h</span>
 									{/if}
 								</div>
 
+								<!-- Fields -->
 								{#if fieldsForStep(step.id).length > 0}
-									<div class="mt-1">
-										<span class="text-muted-foreground text-xs font-semibold uppercase">Fields</span>
-										<ul class="mt-0.5 space-y-0.5">
+									<div class="mt-2">
+										<span
+											class="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider"
+											>Fields</span
+										>
+										<div class="mt-1 space-y-1">
 											{#each fieldsForStep(step.id) as field}
-												<li class="text-xs">
-													{field.ordinal}. <strong>{field.label}</strong> ({field.valueType})
-													{#if field.unit}unit={field.unit}{/if}
-													default={defaultDisplay(field)}
-													&middot; captureActual: {field.captureActualOnComplete}
-												</li>
+												<div class="flex flex-wrap items-center gap-1.5 text-xs">
+													<span class="text-muted-foreground">{field.ordinal}.</span>
+													<span class="font-medium">{field.label}</span>
+													<code
+														class="bg-muted rounded px-1 py-0.5 text-[10px] leading-none"
+														>{field.valueType}</code
+													>
+													{#if field.unit}
+														<span class="text-muted-foreground">unit={field.unit}</span>
+													{/if}
+													<span class="text-muted-foreground"
+														>default={defaultDisplay(field)}</span
+													>
+													{#if field.captureActualOnComplete}
+														<span
+															class="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] leading-none text-blue-600 dark:text-blue-400"
+															>capture</span
+														>
+													{/if}
+												</div>
 											{/each}
-										</ul>
+										</div>
 									</div>
 								{/if}
 							</div>
@@ -143,5 +249,5 @@
 				{/each}
 			</div>
 		{/each}
-	</section>
+	</main>
 </div>
