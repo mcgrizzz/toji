@@ -1,5 +1,20 @@
 import { table, t } from 'spacetimedb/server';
 
+// ── Future concepts (not yet implemented) ─────────────────────────────────────
+//
+// Block
+//   A reusable authored grouping unit above steps/tasks. This will eventually
+//   replace ad hoc sectionKey / sectionLabel grouping with a first-class schema
+//   concept for things like "rice prep", "daily fermentation checks", etc.
+//
+// ObservationSetSpec / ObservationValueSpec
+//   Structured measurement/logging definitions for graphable batch data such as
+//   temperature, pH, baumé, alcohol, chamber temp, and paired readings.
+//
+// ToolAttachment / ToolOutputBinding
+//   Calculator/tool attachment points plus bindings that map tool outputs back
+//   into authored fields or runtime values.
+
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
 const DataType = t.enum('DataType', ['recipe', 'process', 'water_profile']);
@@ -32,18 +47,6 @@ const QuantityMode = t.enum('QuantityMode', [
   'ratio_of_stage_rice',
   'ratio_of_target',
 ]);
-
-const WorkflowKind = t.enum('WorkflowKind', ['koji', 'moto', 'moromi']);
-
-const ScheduleEventKind = t.enum('ScheduleEventKind', [
-  'goal',
-  'check',
-  'action',
-  'milestone',
-  'measurement',
-]);
-
-const TimingKind = t.enum('TimingKind', ['absolute', 'relative_to_stage']);
 
 export const TaskKind = t.enum('TaskKind', [
   'milestone',
@@ -220,8 +223,6 @@ export const ProcessStepSpec = table(
     isCheckable: t.bool(),
     sectionKey: t.option(t.string()),
     sectionLabel: t.option(t.string()),
-    scheduledOffsetH: t.option(t.f64()),
-    durationH: t.option(t.f64()),
     notes: t.option(t.string()),
   }
 );
@@ -361,53 +362,3 @@ export const WaterProfileIon = table(
   }
 );
 
-// ── DEPRECATED: Schedule tables ───────────────────────────────────────────────
-// These tables are superseded by TaskSpec. They remain present for migration
-// continuity only. No new code should treat them as authoritative.
-// Remove in the next schema migration commit.
-
-// TODO: Migrate schedule to reference ProcessStageSpec/ProcessStepSpec directly
-export const ScheduleTable = table(
-  {
-    name: 'schedule',
-    public: true,
-    indexes: [
-      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
-    ],
-  },
-  {
-    id: t.string().primaryKey(),
-    processEntityId: t.string(),
-    workflowKind: WorkflowKind,
-    name: t.string(),
-  }
-);
-
-// TODO: Migrate schedule events to reference ProcessStageSpec ordinals
-/**
- * For absolute: use hoursFromStart; stageOrdinal/offsetHours null.
- * For relative_to_stage: use stageOrdinal+offsetHours; hoursFromStart null.
- */
-export const ScheduleEvent = table(
-  {
-    name: 'schedule_event',
-    public: true,
-    indexes: [
-      { accessor: 'byScheduleId', algorithm: 'btree' as const, columns: ['scheduleId'] },
-    ],
-  },
-  {
-    id: t.string().primaryKey(),
-    scheduleId: t.string(),
-    ordinal: t.i32(),
-    kind: ScheduleEventKind,
-    timingKind: TimingKind,
-    hoursFromStart: t.option(t.f64()),
-    stageOrdinal: t.option(t.i32()),
-    offsetHours: t.option(t.f64()),
-    label: t.string(),
-    description: t.option(t.string()),
-    durationH: t.option(t.f64()),
-    note: t.option(t.string()),
-  }
-);

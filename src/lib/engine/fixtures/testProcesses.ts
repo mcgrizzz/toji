@@ -62,9 +62,7 @@ const kojiSteps: ProcessStepSpec[] = [
 		instructionTemplate: 'Sprinkle {tane-koji} onto steamed rice.',
 		isCheckable: true,
 		sectionKey: 'inoculation',
-		sectionLabel: 'Inoculation',
-		scheduledOffsetH: 0,
-		durationH: 0.5
+		sectionLabel: 'Inoculation'
 	},
 	{
 		id: 'kst-2',
@@ -75,9 +73,7 @@ const kojiSteps: ProcessStepSpec[] = [
 		instructionTemplate: 'Measure bed temperature.',
 		isCheckable: true,
 		sectionKey: 'incubation',
-		sectionLabel: 'Incubation',
-		scheduledOffsetH: 12,
-		durationH: 0.25
+		sectionLabel: 'Incubation'
 	}
 ];
 
@@ -142,8 +138,7 @@ const motoSteps: ProcessStepSpec[] = [
 		instructionTemplate: 'Add water, koji, and yeast.',
 		isCheckable: true,
 		sectionKey: 'mix',
-		sectionLabel: 'Mixing',
-		scheduledOffsetH: 0
+		sectionLabel: 'Mixing'
 	}
 ];
 
@@ -213,9 +208,7 @@ const moromiSteps: ProcessStepSpec[] = [
 		instructionTemplate: 'Add steamed rice to the mash.',
 		isCheckable: true,
 		sectionKey: 'addition',
-		sectionLabel: 'Addition',
-		scheduledOffsetH: 0,
-		durationH: 1
+		sectionLabel: 'Addition'
 	},
 	{
 		id: 'rst-2',
@@ -226,9 +219,7 @@ const moromiSteps: ProcessStepSpec[] = [
 		instructionTemplate: 'Add steamed rice to the mash.',
 		isCheckable: false,
 		sectionKey: 'addition',
-		sectionLabel: 'Addition',
-		scheduledOffsetH: 48,
-		durationH: 1
+		sectionLabel: 'Addition'
 	}
 ];
 

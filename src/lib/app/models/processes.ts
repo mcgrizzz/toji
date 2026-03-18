@@ -38,8 +38,6 @@ export type ProcessStepSpec = {
 	isCheckable: boolean;
 	sectionKey?: string;
 	sectionLabel?: string;
-	scheduledOffsetH?: number;
-	durationH?: number;
 	notes?: string;
 };
 

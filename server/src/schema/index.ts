@@ -28,8 +28,6 @@ export {
   RecipeProcessMaterialBinding,
   WaterProfileIon,
   TaskSpec,
-  ScheduleTable,
-  ScheduleEvent,
 } from './recipe';
 
 export {
@@ -70,8 +68,6 @@ import {
   RecipeProcessMaterialBinding,
   WaterProfileIon,
   TaskSpec,
-  ScheduleTable,
-  ScheduleEvent,
 } from './recipe';
 
 import {
@@ -100,8 +96,6 @@ export default schema({
   RecipeProcessMaterialBinding,
   WaterProfileIon,
   TaskSpec,
-  ScheduleTable,
-  ScheduleEvent,
   CatalogRiceVariety,
   CatalogYeastProduct,
   CatalogKojiSporeProduct,
