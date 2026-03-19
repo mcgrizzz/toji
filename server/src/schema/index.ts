@@ -14,6 +14,7 @@ export {
 
 export {
   User,
+  UserIdentity,
   Entity,
   Recipe,
   Process,
@@ -54,6 +55,7 @@ import {
 
 import {
   User,
+  UserIdentity,
   Entity,
   Recipe,
   Process,
@@ -82,6 +84,7 @@ import {
 
 export default schema({
   User,
+  UserIdentity,
   Entity,
   Recipe,
   Process,

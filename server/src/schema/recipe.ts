@@ -64,10 +64,38 @@ const TaskTimingKind = t.enum('TaskTimingKind', [
 // ── User ──────────────────────────────────────────────────────────────────────
 
 export const User = table(
-  { name: 'user', public: true },
+  {
+    name: 'user',
+    public: true,
+  },
   {
     id: t.string().primaryKey(),
-    age: t.i32().optional(),
+    displayName: t.string(),
+    email: t.string().optional(),
+    avatarUrl: t.string().optional(),
+    createdAt: t.timestamp(),
+    updatedAt: t.timestamp(),
+  }
+);
+
+/**
+ * Maps a SpacetimeDB Identity (derived from issuer + subject) back to a User.
+ * Each auth provider login produces a unique Identity; this table unifies them.
+ */
+export const UserIdentity = table(
+  {
+    name: 'user_identity',
+    public: true,
+    indexes: [
+      { accessor: 'byUserId', algorithm: 'btree' as const, columns: ['userId'] },
+    ],
+  },
+  {
+    identityHex: t.string().primaryKey(),
+    userId: t.string(),
+    issuer: t.string(),
+    subject: t.string(),
+    createdAt: t.timestamp(),
   }
 );
 

@@ -1,11 +1,51 @@
 import { t } from 'spacetimedb/server';
-import { Timestamp } from 'spacetimedb';
+import { SenderError, Timestamp } from 'spacetimedb';
 import spacetimedb from './schema';
 import { seedDemoData as seedDemoDataFn } from './seed/seedData';
 
 export default spacetimedb;
 
-export const onConnect = spacetimedb.clientConnected(_ctx => {});
+const ALLOWED_ISSUERS = new Set([
+  'https://discord.com',
+  'https://auth.spacetimedb.com',
+]);
+
+export const onConnect = spacetimedb.clientConnected(ctx => {
+  if (ctx.senderAuth.isInternal) return;
+  const jwt = ctx.senderAuth.jwt;
+  if (jwt == null) {
+    throw new SenderError('Unauthorized: JWT is required to connect');
+  }
+  if (!ALLOWED_ISSUERS.has(jwt.issuer)) {
+    throw new SenderError(`Unauthorized: issuer '${jwt.issuer}' is not allowed`);
+  }
+
+  // Upsert User + UserIdentity for non-admin issuers
+  if (jwt.issuer === 'https://auth.spacetimedb.com') return;
+
+  const identityHex = ctx.sender.toHexString();
+  const now = ctx.timestamp;
+
+  const existing = ctx.db.UserIdentity.identityHex.find(identityHex);
+  if (!existing) {
+    const userId = ctx.newUuidV4().toString();
+    ctx.db.User.insert({
+      id: userId,
+      displayName: jwt.subject,
+      email: undefined,
+      avatarUrl: undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+    ctx.db.UserIdentity.insert({
+      identityHex,
+      userId,
+      issuer: jwt.issuer,
+      subject: jwt.subject,
+      createdAt: now,
+    });
+  }
+});
 export const onDisconnect = spacetimedb.clientDisconnected(_ctx => {});
 
 // ── DTO conversion helpers ──────────────────────────────────────────────────
@@ -15,6 +55,13 @@ function tsToIso(ts: { toISOString(): string }): string {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/** Resolve the User.id for the current sender. Returns null for system/admin connections. */
+function resolveUserId(ctx: any): string | null {
+  const identityHex = ctx.sender.toHexString();
+  const link = ctx.db.UserIdentity.identityHex.find(identityHex);
+  return link?.userId ?? null;
+}
 
 function isSystemOwner(ownerId: string): boolean {
   return ownerId === '__system__';
@@ -1074,6 +1121,24 @@ export const deleteRecipe = spacetimedb.reducer(
     // Delete payload and entity
     ctx.db.Recipe.entityId.delete(recipeId);
     ctx.db.Entity.id.delete(recipeId);
+  }
+);
+
+export const syncProfile = spacetimedb.reducer(
+  { displayName: t.string(), email: t.option(t.string()), avatarUrl: t.option(t.string()) },
+  (ctx, { displayName, email, avatarUrl }) => {
+    const userId = resolveUserId(ctx);
+    if (!userId) return;
+    const user = ctx.db.User.id.find(userId);
+    if (!user) return;
+    ctx.db.User.id.delete(userId);
+    ctx.db.User.insert({
+      ...user,
+      displayName,
+      email,
+      avatarUrl,
+      updatedAt: ctx.timestamp,
+    });
   }
 );
 

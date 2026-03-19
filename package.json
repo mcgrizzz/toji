@@ -47,6 +47,7 @@
 		"vite": "^7.2.6"
 	},
 	"dependencies": {
+		"arctic": "^3.7.0",
 		"spacetimedb": "^2.0.4"
 	}
 }
