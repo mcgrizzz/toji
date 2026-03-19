@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { getLibraryEntries, getRecipeBundle, type LibraryEntry } from '$lib/services/libraryService';
 	import type { RecipeBundle } from '$lib/app/types';
+	import DebugNav from '../DebugNav.svelte';
 	import type { WorkflowKind } from '$lib/engine/models/scheduleTypes';
 	import { resolveSchedule, type ResolvedSchedule } from '$lib/engine/resolvers/resolveSchedules';
 
@@ -22,6 +23,9 @@
 	onMount(async () => {
 		try {
 			entries = await getLibraryEntries();
+			if (entries.length > 0) {
+				loadBundle(entries[0].snapshotId);
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -100,12 +104,7 @@
 	}
 </script>
 
-<nav class="flex gap-3 border-b px-4 py-2 text-xs text-muted-foreground">
-	<a href="/test-engine" class="hover:text-foreground">Engine</a>
-	<a href="/test-processes" class="hover:text-foreground">Processes</a>
-	<a href="/test-plan" class="hover:text-foreground">Plan</a>
-	<span class="font-semibold text-foreground">Schedule</span>
-</nav>
+<DebugNav current="schedule" />
 
 <div class="mx-auto max-w-5xl space-y-6 p-4">
 	<div>

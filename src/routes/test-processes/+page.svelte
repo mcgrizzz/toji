@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { getLibraryEntries, getRecipeBundle, type LibraryEntry } from '$lib/services/libraryService';
 	import type { RecipeBundle } from '$lib/app/types';
+	import DebugNav from '../DebugNav.svelte';
 
 	let entries = $state<LibraryEntry[]>([]);
 	let bundle = $state<RecipeBundle | null>(null);
@@ -14,6 +15,9 @@
 	onMount(async () => {
 		try {
 			entries = await getLibraryEntries();
+			if (entries.length > 0) {
+				loadBundle(entries[0].snapshotId);
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -40,16 +44,11 @@
 	}
 </script>
 
-<nav class="flex gap-3 border-b px-4 py-2 text-xs text-muted-foreground">
-	<a href="/test-engine" class="hover:text-foreground">Engine</a>
-	<span class="font-semibold text-foreground">Processes</span>
-	<a href="/test-plan" class="hover:text-foreground">Plan</a>
-	<a href="/test-schedule" class="hover:text-foreground">Schedule</a>
-</nav>
+<DebugNav current="processes" />
 
 <div class="mx-auto max-w-4xl space-y-6 p-4">
 	<div>
-		<h1 class="text-lg font-semibold">Recipe Inspector</h1>
+		<h1 class="text-lg font-semibold">Recipe Bundle Inspector</h1>
 		<p class="text-sm text-muted-foreground">Browse DB-backed recipe bundles.</p>
 	</div>
 

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { getLibraryEntries, getRecipeBundle, type LibraryEntry } from '$lib/services/libraryService';
-	import { getMyInventory, type Inventory } from '$lib/services/inventoryService';
+	import { getSeedInventory, type Inventory } from '$lib/services/inventoryService';
 	import type { RecipeBundle } from '$lib/app/types';
+	import DebugNav from '../DebugNav.svelte';
 	import { resolvePlan } from '$lib/engine/resolvers/resolvePlan';
 	import type { MaterialsBill, RecipePlan } from '$lib/engine/models/planTypes';
 
@@ -15,11 +16,15 @@
 	let loadingBundle = $state(false);
 	let error = $state('');
 	let selectedSnapshotId = $state('');
+	let targetValue = $state(5.5);
 	let debugOpen = $state(false);
 
 	onMount(async () => {
 		try {
-			[entries, inventory] = await Promise.all([getLibraryEntries(), getMyInventory()]);
+			[entries, inventory] = await Promise.all([getLibraryEntries(), getSeedInventory()]);
+			if (entries.length > 0) {
+				loadBundle(entries[0].snapshotId);
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -37,6 +42,7 @@
 		error = '';
 		try {
 			bundle = await getRecipeBundle(snapshotId);
+			targetValue = bundle.defaults.targetValue;
 			buildPlan();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -60,7 +66,7 @@
 
 		const autoPlan: RecipePlan = {
 			recipeSnapshotId: bundle.id,
-			target: { kind: bundle.defaults.targetKind, value: bundle.defaults.targetValue },
+			target: { kind: bundle.defaults.targetKind, value: targetValue },
 			koji: kojiStrain
 				? { mode: 'make', riceLot, kojiStrain }
 				: { mode: 'premade' },
@@ -92,12 +98,7 @@
 	}
 </script>
 
-<nav class="flex gap-3 border-b px-4 py-2 text-xs text-muted-foreground">
-	<a href="/test-engine" class="hover:text-foreground">Engine</a>
-	<a href="/test-processes" class="hover:text-foreground">Processes</a>
-	<span class="font-semibold text-foreground">Plan</span>
-	<a href="/test-schedule" class="hover:text-foreground">Schedule</a>
-</nav>
+<DebugNav current="plan" />
 
 <div class="mx-auto max-w-4xl space-y-6 p-4">
 	<div>
@@ -133,11 +134,19 @@
 		{:else if error}
 			<p class="text-sm text-destructive">{error}</p>
 		{:else if bill}
-			<!-- Target summary -->
-			<div class="text-sm text-muted-foreground">
-				Target: <strong>{bundle?.defaults.targetValue}</strong>
-				{bundle?.defaults.targetKind.replace(/_/g, ' ')}
-				· using first available inventory items
+			<!-- Target override -->
+			<div class="flex items-center gap-3 text-sm text-muted-foreground">
+				<label for="target-value" class="shrink-0">Target ({bundle?.defaults.targetKind.replace(/_/g, ' ')}):</label>
+				<input
+					id="target-value"
+					type="number"
+					step="0.1"
+					min="0.1"
+					class="w-24 rounded border bg-background px-2 py-1 font-mono text-sm text-foreground focus:ring-2 focus:ring-ring"
+					bind:value={targetValue}
+					onchange={() => buildPlan()}
+				/>
+				<span class="text-xs">kg · using first available inventory items</span>
 			</div>
 
 			<!-- Koji -->
