@@ -7,13 +7,15 @@ export type SeedStep = {
   goals: string[];
   checks: string[];
   actions: string[];
+  sectionKey?: string;
+  sectionLabel?: string;
 };
 
 export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: SeedStep[]): void {
   let ord = 0;
   for (const step of steps) {
-    const sectionKey = step.label.toLowerCase().replace(/[\s/]+/g, '_');
-    const sectionLabel = step.label;
+    const sectionKey = step.sectionKey ?? step.label.toLowerCase().replace(/[\s/]+/g, '_');
+    const sectionLabel = step.sectionLabel ?? step.label;
 
     // Milestone row
     ctx.db.TaskSpec.insert({
