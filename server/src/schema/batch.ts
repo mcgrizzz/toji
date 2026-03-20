@@ -169,16 +169,64 @@ export const BatchTask = table(
   }
 );
 
+// ── Observation / context tables ────────────────────────────────────────────
+
+export const BatchObservation = table(
+  {
+    name: 'batch_observation',
+    public: true,
+    indexes: [
+      { accessor: 'byBatchId', algorithm: 'btree' as const, columns: ['batchId'] },
+      { accessor: 'byBatchProcessId', algorithm: 'btree' as const, columns: ['batchProcessId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    batchId: t.string(),
+    batchProcessId: t.option(t.string()),
+    batchStageId: t.option(t.string()),
+    batchStepId: t.option(t.string()),
+    batchTaskId: t.option(t.string()),
+    processMetricId: t.option(t.string()),
+    stepPromptId: t.option(t.string()),
+    recordedAt: t.timestamp(),
+    numberValue: t.option(t.f64()),
+    textValue: t.option(t.string()),
+    boolValue: t.option(t.bool()),
+    rawJson: t.option(t.string()),
+    derivedJson: t.option(t.string()),
+    notes: t.option(t.string()),
+  }
+);
+
+export const BatchContextValue = table(
+  {
+    name: 'batch_context_value',
+    public: true,
+    indexes: [
+      { accessor: 'byBatchId', algorithm: 'btree' as const, columns: ['batchId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    batchId: t.string(),
+    batchProcessId: t.option(t.string()),
+    batchStageId: t.option(t.string()),
+    key: t.string(),
+    numberValue: t.option(t.f64()),
+    textValue: t.option(t.string()),
+    boolValue: t.option(t.bool()),
+    effectiveAt: t.timestamp(),
+    notes: t.option(t.string()),
+  }
+);
+
 // ── Future concepts (not yet implemented) ─────────────────────────────────────
 //
 // Block
 //   A discrete unit of work within a stage (e.g. "rice prep block" containing
 //   rinse → soak → drain → steam). Blocks group steps for reuse and calculator
 //   attachment.
-//
-// ObservationSetSpec / ObservationValueSpec
-//   Structured logging definitions — what measurements to capture at each
-//   observation point (temperature, pH, baumé, etc.).
 //
 // ToolAttachment / ToolOutputBinding
 //   Attaches calculators or external tools to blocks/tasks, with bindings

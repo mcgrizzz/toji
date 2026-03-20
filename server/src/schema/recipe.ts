@@ -7,10 +7,6 @@ import { table, t } from 'spacetimedb/server';
 //   replace ad hoc sectionKey / sectionLabel grouping with a first-class schema
 //   concept for things like "rice prep", "daily fermentation checks", etc.
 //
-// ObservationSetSpec / ObservationValueSpec
-//   Structured measurement/logging definitions for graphable batch data such as
-//   temperature, pH, baumé, alcohol, chamber temp, and paired readings.
-//
 // ToolAttachment / ToolOutputBinding
 //   Calculator/tool attachment points plus bindings that map tool outputs back
 //   into authored fields or runtime values.
@@ -59,6 +55,24 @@ export const TaskKind = t.enum('TaskKind', [
 const TaskTimingKind = t.enum('TaskTimingKind', [
   'absolute',
   'relative_to_stage',
+]);
+
+const PromptType = t.enum('PromptType', [
+  'metric',
+  'qualitative',
+  'weight_checkpoint',
+  'note',
+]);
+
+const TransitionWhen = t.enum('TransitionWhen', [
+  'before_start',
+  'before_complete',
+]);
+
+const TransitionRuleType = t.enum('TransitionRuleType', [
+  'range_check',
+  'boolean_check',
+  'qualitative_check',
 ]);
 
 // ── User ──────────────────────────────────────────────────────────────────────
@@ -295,6 +309,54 @@ export const StageMetric = table(
     targetMinNumber: t.option(t.f64()),
     targetMaxNumber: t.option(t.f64()),
     targetText: t.option(t.string()),
+    notes: t.option(t.string()),
+  }
+);
+
+// ── Step prompt / transition tables ──────────────────────────────────────────
+
+export const StepPrompt = table(
+  {
+    name: 'step_prompt',
+    public: true,
+    indexes: [
+      { accessor: 'byStepId', algorithm: 'btree' as const, columns: ['stepId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    stepId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    promptType: PromptType,
+    processMetricId: t.option(t.string()),
+    requiredForCompletion: t.bool(),
+    notes: t.option(t.string()),
+  }
+);
+
+export const StepTransition = table(
+  {
+    name: 'step_transition',
+    public: true,
+    indexes: [
+      { accessor: 'byStepId', algorithm: 'btree' as const, columns: ['stepId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    stepId: t.string(),
+    ordinal: t.i32(),
+    transitionWhen: TransitionWhen,
+    ruleType: TransitionRuleType,
+    processMetricId: t.option(t.string()),
+    stepPromptId: t.option(t.string()),
+    minNumber: t.option(t.f64()),
+    maxNumber: t.option(t.f64()),
+    expectedBool: t.option(t.bool()),
+    expectedText: t.option(t.string()),
+    hardBlock: t.bool(),
     notes: t.option(t.string()),
   }
 );

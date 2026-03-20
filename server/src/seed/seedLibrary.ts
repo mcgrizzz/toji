@@ -104,6 +104,15 @@ export function seedLibrary(ctx: any): void {
     ctx.db.StageMetric.insert({ id: 'sm-koji-ueda-making-chamber_temp', stageId: kojiStageId, processMetricId: pmChamberTemp, ordinal: 2, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
     ctx.db.StageMetric.insert({ id: 'sm-koji-ueda-making-weight_ratio', stageId: kojiStageId, processMetricId: pmWeightRatio, ordinal: 3, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
 
+    // Koji step prompts + transitions (skeletal — 2 examples)
+    // Drying step: weight checkpoint prompt + range_check transition
+    ctx.db.StepPrompt.insert({ id: 'sp-koji-ueda-dry-weight', stepId: kojiStepIds.dry, ordinal: 1, key: 'dry_weight_check', label: 'Drying Weight Check', promptType: { tag: 'weight_checkpoint' }, processMetricId: pmWeightRatio, requiredForCompletion: true, notes: undefined });
+    ctx.db.StepTransition.insert({ id: 'st-koji-ueda-dry-weight', stepId: kojiStepIds.dry, ordinal: 1, transitionWhen: { tag: 'before_complete' }, ruleType: { tag: 'range_check' }, processMetricId: pmWeightRatio, stepPromptId: 'sp-koji-ueda-dry-weight', minNumber: 28, maxNumber: 31, expectedBool: undefined, expectedText: undefined, hardBlock: false, notes: undefined });
+
+    // Inoculation step: metric prompt for rice temp + range_check transition
+    ctx.db.StepPrompt.insert({ id: 'sp-koji-ueda-inoc-temp', stepId: kojiStepIds.inoculate, ordinal: 1, key: 'inoc_rice_temp', label: 'Rice Temperature', promptType: { tag: 'metric' }, processMetricId: pmKojiTemp, requiredForCompletion: false, notes: undefined });
+    ctx.db.StepTransition.insert({ id: 'st-koji-ueda-inoc-temp', stepId: kojiStepIds.inoculate, ordinal: 1, transitionWhen: { tag: 'before_start' }, ruleType: { tag: 'range_check' }, processMetricId: pmKojiTemp, stepPromptId: 'sp-koji-ueda-inoc-temp', minNumber: undefined, maxNumber: 40, expectedBool: undefined, expectedText: undefined, hardBlock: false, notes: undefined });
+
     // Koji schedule (TaskSpec rows) — with explicit sectionKey/sectionLabel
     const kojiSteps: SeedStep[] = [
       { label: 'Soak + Drain Rest', sectionKey: 'soaking', sectionLabel: 'Soaking', atH: 0, durationH: 4, goals: ['Target 29–32% weight gain by end of soak/drain period'], checks: [], actions: ['Soak rice to target absorption, drain, then rest to allow moisture to distribute evenly'] },

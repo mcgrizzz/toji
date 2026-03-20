@@ -25,6 +25,8 @@ export {
   ProcessStep,
   ProcessMetric,
   StageMetric,
+  StepPrompt,
+  StepTransition,
   RecipeProcess,
   RecipeMaterial,
   RecipeMaterialBinding,
@@ -39,6 +41,8 @@ export {
   BatchStep,
   BatchMaterial,
   BatchTask,
+  BatchObservation,
+  BatchContextValue,
 } from './batch';
 
 import {
@@ -66,6 +70,8 @@ import {
   ProcessStep,
   ProcessMetric,
   StageMetric,
+  StepPrompt,
+  StepTransition,
   RecipeProcess,
   RecipeMaterial,
   RecipeMaterialBinding,
@@ -80,6 +86,8 @@ import {
   BatchStep,
   BatchMaterial,
   BatchTask,
+  BatchObservation,
+  BatchContextValue,
 } from './batch';
 
 export default schema({
@@ -95,6 +103,8 @@ export default schema({
   ProcessStep,
   ProcessMetric,
   StageMetric,
+  StepPrompt,
+  StepTransition,
   RecipeProcess,
   RecipeMaterial,
   RecipeMaterialBinding,
@@ -115,4 +125,6 @@ export default schema({
   BatchStep,
   BatchMaterial,
   BatchTask,
+  BatchObservation,
+  BatchContextValue,
 });

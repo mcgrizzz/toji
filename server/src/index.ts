@@ -724,7 +724,7 @@ function copyRecipeEntity(tx: any, sourceEntityId: string, senderId: string, ove
     rpuIdMap.set(rpu.id, newRpuId);
     tx.db.RecipeProcess.insert({
       id: newRpuId,
-      recipeEntityId: newEntityId,
+      recipeAssetId: newEntityId,
       ordinal: rpu.ordinal,
       label: rpu.label,
       processSnapshotAssetId: rpu.processSnapshotAssetId,
@@ -740,7 +740,7 @@ function copyRecipeEntity(tx: any, sourceEntityId: string, senderId: string, ove
     rmsIdMap.set(rms.id, newRmsId);
     tx.db.RecipeMaterial.insert({
       id: newRmsId,
-      recipeEntityId: newEntityId,
+      recipeAssetId: newEntityId,
       key: rms.key,
       label: rms.label,
       materialClass: rms.materialClass,
