@@ -1,10 +1,10 @@
 /** Process kind — mirrors server ProcessKind enum. */
 export type ProcessKind = 'koji' | 'moto' | 'moromi' | 'other';
 
-/** Client-side mirror of server ProcessStageSpec table. */
-export type ProcessStageSpec = {
+/** Client-side mirror of server ProcessStage table. */
+export type ProcessStage = {
 	id: string;
-	processEntityId: string;
+	processAssetId: string;
 	ordinal: number;
 	key: string;
 	label: string;
@@ -12,11 +12,11 @@ export type ProcessStageSpec = {
 	notes?: string;
 };
 
-/** Client-side mirror of server ProcessMaterialSlotSpec table. */
-export type ProcessMaterialSlotSpec = {
+/** Client-side mirror of server ProcessMaterialSlot table. */
+export type ProcessMaterialSlot = {
 	id: string;
-	processEntityId: string;
-	stageSpecId?: string;
+	processAssetId: string;
+	stageId?: string;
 	ordinal: number;
 	key: string;
 	label: string;
@@ -27,54 +27,36 @@ export type ProcessMaterialSlotSpec = {
 	notes?: string;
 };
 
-/** Client-side mirror of server ProcessStepSpec table. */
-export type ProcessStepSpec = {
+/** Client-side mirror of server ProcessStep table. */
+export type ProcessStep = {
 	id: string;
-	stageSpecId: string;
+	stageId: string;
 	ordinal: number;
 	key: string;
 	label: string;
 	instructionTemplate: string;
-	isCheckable: boolean;
 	sectionKey?: string;
 	sectionLabel?: string;
 	notes?: string;
 };
 
-/** Client-side mirror of server ProcessStepFieldSpec table. */
-export type ProcessStepFieldSpec = {
-	id: string;
-	stepSpecId: string;
-	ordinal: number;
-	key: string;
-	label: string;
-	valueType: 'number' | 'text' | 'boolean';
-	unit?: string;
-	defaultNumberValue?: number;
-	defaultTextValue?: string;
-	defaultBoolValue?: boolean;
-	captureActualOnComplete: boolean;
-	notes?: string;
-};
-
 /** Denormalized snapshot of a process with its full spec tree. */
 export type ProcessSnapshot = {
-	entityId: string;
+	assetId: string;
 	processKind: ProcessKind;
 	name: string;
-	stages: ProcessStageSpec[];
-	materialSlots: ProcessMaterialSlotSpec[];
-	steps: ProcessStepSpec[];
-	stepFields: ProcessStepFieldSpec[];
+	stages: ProcessStage[];
+	materialSlots: ProcessMaterialSlot[];
+	steps: ProcessStep[];
 	notes?: string;
 };
 
-/** Lightweight ref from a recipe to a process snapshot. Mirrors server RecipeProcessUse. */
+/** Lightweight ref from a recipe to a process snapshot. Mirrors server RecipeProcess. */
 export type ProcessSource = {
 	id: string;
-	recipeEntityId: string;
+	recipeAssetId: string;
 	ordinal: number;
 	label: string;
-	processSnapshotEntityId: string;
+	processSnapshotAssetId: string;
 	notes?: string;
 };

@@ -11,18 +11,18 @@ export type SeedStep = {
   sectionLabel?: string;
 };
 
-export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: SeedStep[]): void {
+export function insertTaskSpecSteps(ctx: any, processAssetId: string, steps: SeedStep[]): void {
   let ord = 0;
   for (const step of steps) {
     const sectionKey = step.sectionKey ?? step.label.toLowerCase().replace(/[\s/]+/g, '_');
     const sectionLabel = step.sectionLabel ?? step.label;
 
     // Milestone row
-    ctx.db.TaskSpec.insert({
+    ctx.db.ProcessTask.insert({
       id: ctx.newUuidV4().toString(),
-      processEntityId,
-      stageSpecId: undefined,
-      stepSpecId: undefined,
+      processAssetId,
+      stageId: undefined,
+      stepId: undefined,
       ordinal: ord++,
       key: `${sectionKey}_milestone`,
       label: step.label,
@@ -31,7 +31,7 @@ export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: Se
       sectionLabel,
       timingKind: { tag: 'absolute' },
       hoursFromStart: step.atH,
-      anchorStageSpecId: undefined,
+      anchorStageId: undefined,
       offsetHours: undefined,
       durationH: step.durationH,
       description: undefined,
@@ -41,11 +41,11 @@ export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: Se
 
     // Goal rows
     for (const g of step.goals) {
-      ctx.db.TaskSpec.insert({
+      ctx.db.ProcessTask.insert({
         id: ctx.newUuidV4().toString(),
-        processEntityId,
-        stageSpecId: undefined,
-        stepSpecId: undefined,
+        processAssetId,
+        stageId: undefined,
+        stepId: undefined,
         ordinal: ord++,
         key: `${sectionKey}_goal_${ord}`,
         label: g,
@@ -54,7 +54,7 @@ export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: Se
         sectionLabel,
         timingKind: { tag: 'absolute' },
         hoursFromStart: step.atH,
-        anchorStageSpecId: undefined,
+        anchorStageId: undefined,
         offsetHours: undefined,
         durationH: undefined,
         description: g,
@@ -65,11 +65,11 @@ export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: Se
 
     // Check rows
     for (const c of step.checks) {
-      ctx.db.TaskSpec.insert({
+      ctx.db.ProcessTask.insert({
         id: ctx.newUuidV4().toString(),
-        processEntityId,
-        stageSpecId: undefined,
-        stepSpecId: undefined,
+        processAssetId,
+        stageId: undefined,
+        stepId: undefined,
         ordinal: ord++,
         key: `${sectionKey}_check_${ord}`,
         label: c,
@@ -78,7 +78,7 @@ export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: Se
         sectionLabel,
         timingKind: { tag: 'absolute' },
         hoursFromStart: step.atH,
-        anchorStageSpecId: undefined,
+        anchorStageId: undefined,
         offsetHours: undefined,
         durationH: undefined,
         description: c,
@@ -89,11 +89,11 @@ export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: Se
 
     // Action rows
     for (const a of step.actions) {
-      ctx.db.TaskSpec.insert({
+      ctx.db.ProcessTask.insert({
         id: ctx.newUuidV4().toString(),
-        processEntityId,
-        stageSpecId: undefined,
-        stepSpecId: undefined,
+        processAssetId,
+        stageId: undefined,
+        stepId: undefined,
         ordinal: ord++,
         key: `${sectionKey}_action_${ord}`,
         label: a,
@@ -102,7 +102,7 @@ export function insertTaskSpecSteps(ctx: any, processEntityId: string, steps: Se
         sectionLabel,
         timingKind: { tag: 'absolute' },
         hoursFromStart: step.atH,
-        anchorStageSpecId: undefined,
+        anchorStageId: undefined,
         offsetHours: undefined,
         durationH: undefined,
         description: a,

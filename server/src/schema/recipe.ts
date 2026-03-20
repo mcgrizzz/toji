@@ -17,9 +17,9 @@ import { table, t } from 'spacetimedb/server';
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
-const DataType = t.enum('DataType', ['recipe', 'process', 'water_profile']);
+const AssetType = t.enum('AssetType', ['recipe', 'process', 'water_profile']);
 
-const EntityKind = t.enum('EntityKind', ['working', 'snapshot']);
+const AssetKind = t.enum('AssetKind', ['working', 'snapshot']);
 
 const ProvenanceKind = t.enum('ProvenanceKind', [
   'original',
@@ -82,9 +82,9 @@ export const User = table(
  * Maps a SpacetimeDB Identity (derived from issuer + subject) back to a User.
  * Each auth provider login produces a unique Identity; this table unifies them.
  */
-export const UserIdentity = table(
+export const AuthIdentity = table(
   {
-    name: 'user_identity',
+    name: 'auth_identity',
     public: true,
     indexes: [
       { accessor: 'byUserId', algorithm: 'btree' as const, columns: ['userId'] },
@@ -99,18 +99,18 @@ export const UserIdentity = table(
   }
 );
 
-// ── Entity metadata ───────────────────────────────────────────────────────────
+// ── Asset metadata ───────────────────────────────────────────────────────────
 
 /**
- * Shared metadata for all versioned entities (recipes, processes, water profiles).
+ * Shared metadata for all versioned assets (recipes, processes, water profiles).
  * Invariants:
  * - version: null for working, required for snapshot
- * - isPublic: always false for working entities
- * - lineageRootId: equals own id for root entities, inherited for snapshots/copies
+ * - isPublic: always false for working assets
+ * - lineageRootId: equals own id for root assets, inherited for snapshots/copies
  */
-export const Entity = table(
+export const Asset = table(
   {
-    name: 'entity',
+    name: 'asset',
     public: true,
     indexes: [
       { accessor: 'byOwnerId', algorithm: 'btree' as const, columns: ['ownerId'] },
@@ -121,29 +121,29 @@ export const Entity = table(
   {
     id: t.string().primaryKey(),
     ownerId: t.string(),
-    dataType: DataType,
-    entityKind: EntityKind,
+    dataType: AssetType,
+    assetKind: AssetKind,
     name: t.string(),
     description: t.option(t.string()),
     version: t.option(t.string()),
     isPublic: t.bool(),
     isArchived: t.bool(),
     lineageRootId: t.string(),
-    parentEntityId: t.option(t.string()),
+    parentAssetId: t.option(t.string()),
     provenanceKind: ProvenanceKind,
-    provenanceEntityId: t.option(t.string()),
+    provenanceAssetId: t.option(t.string()),
     createdAt: t.timestamp(),
     updatedAt: t.timestamp(),
   }
 );
 
-// ── Typed payload tables (1:1 with Entity via entityId PK) ────────────────────
+// ── Typed payload tables (1:1 with Asset via assetId PK) ────────────────────
 
 export const Recipe = table(
   { name: 'recipe', public: true },
   {
-    entityId: t.string().primaryKey(),
-    defaultWaterProfileEntityId: t.option(t.string()),
+    assetId: t.string().primaryKey(),
+    defaultWaterProfileAssetId: t.option(t.string()),
     attachedBatchId: t.option(t.string()),
     notes: t.option(t.string()),
   }
@@ -152,7 +152,7 @@ export const Recipe = table(
 export const Process = table(
   { name: 'process', public: true },
   {
-    entityId: t.string().primaryKey(),
+    assetId: t.string().primaryKey(),
     processKind: ProcessKind,
     notes: t.option(t.string()),
   }
@@ -161,24 +161,24 @@ export const Process = table(
 export const WaterProfile = table(
   { name: 'water_profile', public: true },
   {
-    entityId: t.string().primaryKey(),
+    assetId: t.string().primaryKey(),
     notes: t.option(t.string()),
   }
 );
 
-// ── Process spec tables ─────────────────────────────────────────────────────
+// ── Process tables ────────────────────────────────────────────────────────────
 
-export const ProcessParamSpec = table(
+export const ProcessParameter = table(
   {
-    name: 'process_param_spec',
+    name: 'process_parameter',
     public: true,
     indexes: [
-      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
+      { accessor: 'byProcessAssetId', algorithm: 'btree' as const, columns: ['processAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    processEntityId: t.string(),
+    processAssetId: t.string(),
     ordinal: t.i32(),
     key: t.string(),
     label: t.string(),
@@ -191,17 +191,17 @@ export const ProcessParamSpec = table(
   }
 );
 
-export const ProcessStageSpec = table(
+export const ProcessStage = table(
   {
-    name: 'process_stage_spec',
+    name: 'process_stage',
     public: true,
     indexes: [
-      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
+      { accessor: 'byProcessAssetId', algorithm: 'btree' as const, columns: ['processAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    processEntityId: t.string(),
+    processAssetId: t.string(),
     ordinal: t.i32(),
     key: t.string(),
     label: t.string(),
@@ -210,18 +210,18 @@ export const ProcessStageSpec = table(
   }
 );
 
-export const ProcessMaterialSlotSpec = table(
+export const ProcessMaterialSlot = table(
   {
-    name: 'process_material_slot_spec',
+    name: 'process_material_slot',
     public: true,
     indexes: [
-      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
+      { accessor: 'byProcessAssetId', algorithm: 'btree' as const, columns: ['processAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    processEntityId: t.string(),
-    stageSpecId: t.option(t.string()),
+    processAssetId: t.string(),
+    stageId: t.option(t.string()),
     ordinal: t.i32(),
     key: t.string(),
     label: t.string(),
@@ -233,67 +233,42 @@ export const ProcessMaterialSlotSpec = table(
   }
 );
 
-export const ProcessStepSpec = table(
+export const ProcessStep = table(
   {
-    name: 'process_step_spec',
+    name: 'process_step',
     public: true,
     indexes: [
-      { accessor: 'byStageSpecId', algorithm: 'btree' as const, columns: ['stageSpecId'] },
+      { accessor: 'byStageId', algorithm: 'btree' as const, columns: ['stageId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    stageSpecId: t.string(),
+    stageId: t.string(),
     ordinal: t.i32(),
     key: t.string(),
     label: t.string(),
     instructionTemplate: t.string(),
-    isCheckable: t.bool(),
     sectionKey: t.option(t.string()),
     sectionLabel: t.option(t.string()),
     notes: t.option(t.string()),
   }
 );
 
-export const ProcessStepFieldSpec = table(
+// ── Task tables ──────────────────────────────────────────────────────────────
+
+export const ProcessTask = table(
   {
-    name: 'process_step_field_spec',
+    name: 'process_task',
     public: true,
     indexes: [
-      { accessor: 'byStepSpecId', algorithm: 'btree' as const, columns: ['stepSpecId'] },
+      { accessor: 'byProcessAssetId', algorithm: 'btree' as const, columns: ['processAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    stepSpecId: t.string(),
-    ordinal: t.i32(),
-    key: t.string(),
-    label: t.string(),
-    valueType: ValueType,
-    unit: t.option(t.string()),
-    defaultNumberValue: t.option(t.f64()),
-    defaultTextValue: t.option(t.string()),
-    defaultBoolValue: t.option(t.bool()),
-    captureActualOnComplete: t.bool(),
-    notes: t.option(t.string()),
-  }
-);
-
-// ── Task spec tables ──────────────────────────────────────────────────────────
-
-export const TaskSpec = table(
-  {
-    name: 'task_spec',
-    public: true,
-    indexes: [
-      { accessor: 'byProcessEntityId', algorithm: 'btree' as const, columns: ['processEntityId'] },
-    ],
-  },
-  {
-    id: t.string().primaryKey(),
-    processEntityId: t.string(),
-    stageSpecId: t.option(t.string()),
-    stepSpecId: t.option(t.string()),
+    processAssetId: t.string(),
+    stageId: t.option(t.string()),
+    stepId: t.option(t.string()),
     ordinal: t.i32(),
     key: t.string(),
     label: t.string(),
@@ -302,7 +277,7 @@ export const TaskSpec = table(
     sectionLabel: t.option(t.string()),
     timingKind: TaskTimingKind,
     hoursFromStart: t.option(t.f64()),
-    anchorStageSpecId: t.option(t.string()),
+    anchorStageId: t.option(t.string()),
     offsetHours: t.option(t.f64()),
     durationH: t.option(t.f64()),
     description: t.option(t.string()),
@@ -313,35 +288,35 @@ export const TaskSpec = table(
 
 // ── Recipe composition tables ───────────────────────────────────────────────
 
-export const RecipeProcessUse = table(
+export const RecipeProcess = table(
   {
-    name: 'recipe_process_use',
+    name: 'recipe_process',
     public: true,
     indexes: [
-      { accessor: 'byRecipeEntityId', algorithm: 'btree' as const, columns: ['recipeEntityId'] },
+      { accessor: 'byRecipeAssetId', algorithm: 'btree' as const, columns: ['recipeAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    recipeEntityId: t.string(),
+    recipeAssetId: t.string(),
     ordinal: t.i32(),
     label: t.string(),
-    processSnapshotEntityId: t.string(),
+    processSnapshotAssetId: t.string(),
     notes: t.option(t.string()),
   }
 );
 
-export const RecipeMaterialSpec = table(
+export const RecipeMaterial = table(
   {
-    name: 'recipe_material_spec',
+    name: 'recipe_material',
     public: true,
     indexes: [
-      { accessor: 'byRecipeEntityId', algorithm: 'btree' as const, columns: ['recipeEntityId'] },
+      { accessor: 'byRecipeAssetId', algorithm: 'btree' as const, columns: ['recipeAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    recipeEntityId: t.string(),
+    recipeAssetId: t.string(),
     key: t.string(),
     label: t.string(),
     materialClass: MaterialClass,
@@ -353,19 +328,19 @@ export const RecipeMaterialSpec = table(
   }
 );
 
-export const RecipeProcessMaterialBinding = table(
+export const RecipeMaterialBinding = table(
   {
-    name: 'recipe_process_material_binding',
+    name: 'recipe_material_binding',
     public: true,
     indexes: [
-      { accessor: 'byRecipeProcessUseId', algorithm: 'btree' as const, columns: ['recipeProcessUseId'] },
+      { accessor: 'byRecipeProcessId', algorithm: 'btree' as const, columns: ['recipeProcessId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    recipeProcessUseId: t.string(),
-    processMaterialSlotSpecId: t.string(),
-    recipeMaterialSpecId: t.string(),
+    recipeProcessId: t.string(),
+    processMaterialSlotId: t.string(),
+    recipeMaterialId: t.string(),
     quantityOverride: t.option(t.f64()),
     quantityUnitOverride: t.option(t.string()),
     notes: t.option(t.string()),
@@ -374,19 +349,18 @@ export const RecipeProcessMaterialBinding = table(
 
 // ── Normalized child tables ───────────────────────────────────────────────────
 
-export const WaterProfileIon = table(
+export const WaterProfileIonTarget = table(
   {
-    name: 'water_profile_ion',
+    name: 'water_profile_ion_target',
     public: true,
     indexes: [
-      { accessor: 'byWaterProfileEntityId', algorithm: 'btree' as const, columns: ['waterProfileEntityId'] },
+      { accessor: 'byWaterProfileAssetId', algorithm: 'btree' as const, columns: ['waterProfileAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    waterProfileEntityId: t.string(),
+    waterProfileAssetId: t.string(),
     ionSymbol: t.string(),
     targetPpm: t.f64(),
   }
 );
-

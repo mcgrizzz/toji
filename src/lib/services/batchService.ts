@@ -3,8 +3,8 @@ import type { RecipePlanDraft } from '$lib/engine/models/planTypes';
 
 export type BatchListItem = {
 	id: string;
-	sourceRecipeEntityId: string;
-	batchRecipeEntityId: string;
+	sourceRecipeAssetId: string;
+	batchRecipeAssetId: string;
 	recipeName: string;
 	status: string;
 	targetKind: string;

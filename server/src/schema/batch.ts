@@ -27,14 +27,14 @@ export const Batch = table(
     public: true,
     indexes: [
       { accessor: 'byOwnerId', algorithm: 'btree' as const, columns: ['ownerId'] },
-      { accessor: 'byBatchRecipeEntityId', algorithm: 'btree' as const, columns: ['batchRecipeEntityId'] },
+      { accessor: 'byBatchRecipeAssetId', algorithm: 'btree' as const, columns: ['batchRecipeAssetId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
     ownerId: t.string(),
-    sourceRecipeEntityId: t.string(),
-    batchRecipeEntityId: t.string(),
+    sourceRecipeAssetId: t.string(),
+    batchRecipeAssetId: t.string(),
     name: t.string(),
     status: BatchStatus,
     targetKind: TargetKind,
@@ -47,11 +47,11 @@ export const Batch = table(
   }
 );
 
-// ── Execution instance tables ────────────────────────────────────────────────
+// ── Execution tables ────────────────────────────────────────────────────────
 
-export const BatchProcessInstance = table(
+export const BatchProcess = table(
   {
-    name: 'batch_process_instance',
+    name: 'batch_process',
     public: true,
     indexes: [
       { accessor: 'byBatchId', algorithm: 'btree' as const, columns: ['batchId'] },
@@ -60,9 +60,9 @@ export const BatchProcessInstance = table(
   {
     id: t.string().primaryKey(),
     batchId: t.string(),
-    recipeProcessUseId: t.string(),
+    recipeProcessId: t.string(),
     ordinal: t.i32(),
-    processSnapshotEntityId: t.string(),
+    processSnapshotAssetId: t.string(),
     label: t.string(),
     status: ExecutionStatus,
     startedAt: t.option(t.timestamp()),
@@ -70,18 +70,18 @@ export const BatchProcessInstance = table(
   }
 );
 
-export const BatchStageInstance = table(
+export const BatchStage = table(
   {
-    name: 'batch_stage_instance',
+    name: 'batch_stage',
     public: true,
     indexes: [
-      { accessor: 'byBatchProcessInstanceId', algorithm: 'btree' as const, columns: ['batchProcessInstanceId'] },
+      { accessor: 'byBatchProcessId', algorithm: 'btree' as const, columns: ['batchProcessId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    batchProcessInstanceId: t.string(),
-    stageSpecId: t.string(),
+    batchProcessId: t.string(),
+    stageId: t.string(),
     ordinal: t.i32(),
     label: t.string(),
     status: ExecutionStatus,
@@ -90,18 +90,18 @@ export const BatchStageInstance = table(
   }
 );
 
-export const BatchStepInstance = table(
+export const BatchStep = table(
   {
-    name: 'batch_step_instance',
+    name: 'batch_step',
     public: true,
     indexes: [
-      { accessor: 'byBatchStageInstanceId', algorithm: 'btree' as const, columns: ['batchStageInstanceId'] },
+      { accessor: 'byBatchStageId', algorithm: 'btree' as const, columns: ['batchStageId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
-    batchStageInstanceId: t.string(),
-    stepSpecId: t.string(),
+    batchStageId: t.string(),
+    stepId: t.string(),
     ordinal: t.i32(),
     label: t.string(),
     renderedInstruction: t.string(),
@@ -114,32 +114,9 @@ export const BatchStepInstance = table(
   }
 );
 
-export const BatchStepFieldValue = table(
+export const BatchMaterial = table(
   {
-    name: 'batch_step_field_value',
-    public: true,
-    indexes: [
-      { accessor: 'byBatchStepInstanceId', algorithm: 'btree' as const, columns: ['batchStepInstanceId'] },
-    ],
-  },
-  {
-    id: t.string().primaryKey(),
-    batchStepInstanceId: t.string(),
-    stepFieldSpecId: t.string(),
-    key: t.string(),
-    plannedNumber: t.option(t.f64()),
-    plannedText: t.option(t.string()),
-    plannedBool: t.option(t.bool()),
-    actualNumber: t.option(t.f64()),
-    actualText: t.option(t.string()),
-    actualBool: t.option(t.bool()),
-    actualLoggedAt: t.option(t.timestamp()),
-  }
-);
-
-export const BatchMaterialPlan = table(
-  {
-    name: 'batch_material_plan',
+    name: 'batch_material',
     public: true,
     indexes: [
       { accessor: 'byBatchId', algorithm: 'btree' as const, columns: ['batchId'] },
@@ -148,10 +125,10 @@ export const BatchMaterialPlan = table(
   {
     id: t.string().primaryKey(),
     batchId: t.string(),
-    batchProcessInstanceId: t.option(t.string()),
-    batchStageInstanceId: t.option(t.string()),
-    processMaterialSlotSpecId: t.option(t.string()),
-    recipeMaterialSpecId: t.option(t.string()),
+    batchProcessId: t.option(t.string()),
+    batchStageId: t.option(t.string()),
+    processMaterialSlotId: t.option(t.string()),
+    recipeMaterialId: t.option(t.string()),
     label: t.string(),
     materialClass: MaterialClass,
     plannedQuantity: t.option(t.f64()),
@@ -163,22 +140,22 @@ export const BatchMaterialPlan = table(
   }
 );
 
-export const BatchTaskInstance = table(
+export const BatchTask = table(
   {
-    name: 'batch_task_instance',
+    name: 'batch_task',
     public: true,
     indexes: [
       { accessor: 'byBatchId', algorithm: 'btree' as const, columns: ['batchId'] },
-      { accessor: 'byBatchProcessInstanceId', algorithm: 'btree' as const, columns: ['batchProcessInstanceId'] },
+      { accessor: 'byBatchProcessId', algorithm: 'btree' as const, columns: ['batchProcessId'] },
     ],
   },
   {
     id: t.string().primaryKey(),
     batchId: t.string(),
-    batchProcessInstanceId: t.string(),
-    batchStageInstanceId: t.option(t.string()),
-    batchStepInstanceId: t.option(t.string()),
-    taskSpecId: t.string(),
+    batchProcessId: t.string(),
+    batchStageId: t.option(t.string()),
+    batchStepId: t.option(t.string()),
+    processTaskId: t.string(),
     ordinal: t.i32(),
     key: t.string(),
     label: t.string(),

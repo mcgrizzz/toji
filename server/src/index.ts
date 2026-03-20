@@ -20,13 +20,13 @@ export const onConnect = spacetimedb.clientConnected(ctx => {
     throw new SenderError(`Unauthorized: issuer '${jwt.issuer}' is not allowed`);
   }
 
-  // Upsert User + UserIdentity for non-admin issuers
+  // Upsert User + AuthIdentity for non-admin issuers
   if (jwt.issuer === 'https://auth.spacetimedb.com') return;
 
   const identityHex = ctx.sender.toHexString();
   const now = ctx.timestamp;
 
-  const existing = ctx.db.UserIdentity.identityHex.find(identityHex);
+  const existing = ctx.db.AuthIdentity.identityHex.find(identityHex);
   if (!existing) {
     const userId = ctx.newUuidV4().toString();
     ctx.db.User.insert({
@@ -37,7 +37,7 @@ export const onConnect = spacetimedb.clientConnected(ctx => {
       createdAt: now,
       updatedAt: now,
     });
-    ctx.db.UserIdentity.insert({
+    ctx.db.AuthIdentity.insert({
       identityHex,
       userId,
       issuer: jwt.issuer,
@@ -59,7 +59,7 @@ function tsToIso(ts: { toISOString(): string }): string {
 /** Resolve the User.id for the current sender. Returns null for system/admin connections. */
 function resolveUserId(ctx: any): string | null {
   const identityHex = ctx.sender.toHexString();
-  const link = ctx.db.UserIdentity.identityHex.find(identityHex);
+  const link = ctx.db.AuthIdentity.identityHex.find(identityHex);
   return link?.userId ?? null;
 }
 
@@ -74,16 +74,16 @@ function addHours(ts: Timestamp, hours: number): Timestamp {
 
 // ── Generic process loaders ─────────────────────────────────────────────────
 
-function loadProcessEntity(tx: any, entityId: string) {
-  const entity = tx.db.Entity.id.find(entityId);
-  if (!entity) throw new Error(`Process entity ${entityId} not found`);
-  const process = tx.db.Process.entityId.find(entityId);
-  if (!process) throw new Error(`Process payload ${entityId} not found`);
+function loadProcessEntity(tx: any, assetId: string) {
+  const entity = tx.db.Asset.id.find(assetId);
+  if (!entity) throw new Error(`Process entity ${assetId} not found`);
+  const process = tx.db.Process.assetId.find(assetId);
+  if (!process) throw new Error(`Process payload ${assetId} not found`);
   return { entity, process };
 }
 
-function loadProcessParamMap(tx: any, entityId: string): Map<string, number | string | boolean> {
-  const rows = [...tx.db.ProcessParamSpec.byProcessEntityId.filter(entityId)];
+function loadProcessParamMap(tx: any, assetId: string): Map<string, number | string | boolean> {
+  const rows = [...tx.db.ProcessParameter.byProcessAssetId.filter(assetId)];
   const map = new Map<string, number | string | boolean>();
   for (const r of rows) {
     switch (r.valueType.tag) {
@@ -95,36 +95,31 @@ function loadProcessParamMap(tx: any, entityId: string): Map<string, number | st
   return map;
 }
 
-function loadProcessStages(tx: any, entityId: string) {
-  return [...tx.db.ProcessStageSpec.byProcessEntityId.filter(entityId)]
+function loadProcessStages(tx: any, assetId: string) {
+  return [...tx.db.ProcessStage.byProcessAssetId.filter(assetId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 }
 
-function loadProcessMaterialSlots(tx: any, entityId: string) {
-  return [...tx.db.ProcessMaterialSlotSpec.byProcessEntityId.filter(entityId)]
+function loadProcessMaterialSlots(tx: any, assetId: string) {
+  return [...tx.db.ProcessMaterialSlot.byProcessAssetId.filter(assetId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 }
 
 function loadRecipeProcessUses(tx: any, recipeEntityId: string) {
-  return [...tx.db.RecipeProcessUse.byRecipeEntityId.filter(recipeEntityId)]
+  return [...tx.db.RecipeProcess.byRecipeAssetId.filter(recipeEntityId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 }
 
 function loadRecipeMaterialSpecs(tx: any, recipeEntityId: string) {
-  return [...tx.db.RecipeMaterialSpec.byRecipeEntityId.filter(recipeEntityId)];
+  return [...tx.db.RecipeMaterial.byRecipeAssetId.filter(recipeEntityId)];
 }
 
 function loadRecipeMaterialBindings(tx: any, rpuId: string) {
-  return [...tx.db.RecipeProcessMaterialBinding.byRecipeProcessUseId.filter(rpuId)];
+  return [...tx.db.RecipeMaterialBinding.byRecipeProcessId.filter(rpuId)];
 }
 
-function loadProcessSteps(tx: any, stageSpecId: string) {
-  return [...tx.db.ProcessStepSpec.byStageSpecId.filter(stageSpecId)]
-    .sort((a: any, b: any) => a.ordinal - b.ordinal);
-}
-
-function loadProcessStepFields(tx: any, stepSpecId: string) {
-  return [...tx.db.ProcessStepFieldSpec.byStepSpecId.filter(stepSpecId)]
+function loadProcessSteps(tx: any, stageId: string) {
+  return [...tx.db.ProcessStep.byStageId.filter(stageId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 }
 
@@ -165,7 +160,7 @@ function projectMoromiPresetFromProcess(entity: any, stages: any[], materialSlot
     name: entity.name,
     isBuiltIn: isSystemOwner(entity.ownerId),
     stages: materialStages.map((stage: any) => {
-      const stageSlots = materialSlots.filter((s: any) => s.stageSpecId === stage.id);
+      const stageSlots = materialSlots.filter((s: any) => s.stageId === stage.id);
       const riceSlot = stageSlots.find((s: any) => s.key === 'rice');
       const kojiSlot = stageSlots.find((s: any) => s.key === 'koji');
       const waterSlot = stageSlots.find((s: any) => s.key === 'water');
@@ -183,13 +178,13 @@ function projectMoromiPresetFromProcess(entity: any, stages: any[], materialSlot
 function projectRecipeAmendmentsCompat(tx: any, processUses: any[]) {
   const amendments: any[] = [];
   for (const pu of processUses) {
-    const { process } = loadProcessEntity(tx, pu.processSnapshotEntityId);
+    const { process } = loadProcessEntity(tx, pu.processSnapshotAssetId);
     const bindings = loadRecipeMaterialBindings(tx, pu.id);
     for (const binding of bindings) {
-      const materialSpec = tx.db.RecipeMaterialSpec.id.find(binding.recipeMaterialSpecId);
+      const materialSpec = tx.db.RecipeMaterial.id.find(binding.recipeMaterialId);
       if (!materialSpec || materialSpec.materialClass.tag !== 'adjunct') continue;
 
-      const slotSpec = tx.db.ProcessMaterialSlotSpec.id.find(binding.processMaterialSlotSpecId);
+      const slotSpec = tx.db.ProcessMaterialSlot.id.find(binding.processMaterialSlotId);
       if (!slotSpec) continue;
 
       const fracOfTotalRice = binding.quantityOverride ?? slotSpec.quantityValue ?? 0;
@@ -198,7 +193,7 @@ function projectRecipeAmendmentsCompat(tx: any, processUses: any[]) {
       if (process.processKind.tag === 'moto') {
         placement = { where: 'moto' as const };
       } else {
-        const stage = slotSpec.stageSpecId ? tx.db.ProcessStageSpec.id.find(slotSpec.stageSpecId) : null;
+        const stage = slotSpec.stageId ? tx.db.ProcessStage.id.find(slotSpec.stageId) : null;
         placement = { where: 'moromi' as const, stageOrdinal: stage?.materialOrdinal ?? 1 };
       }
 
@@ -210,11 +205,11 @@ function projectRecipeAmendmentsCompat(tx: any, processUses: any[]) {
 
 // ── Shared data loaders ─────────────────────────────────────────────────────
 
-function loadWaterProfile(tx: any, entityId: string | undefined) {
-  if (!entityId) return null;
-  const entity = tx.db.Entity.id.find(entityId);
+function loadWaterProfile(tx: any, assetId: string | undefined) {
+  if (!assetId) return null;
+  const entity = tx.db.Asset.id.find(assetId);
   if (!entity) return null;
-  const ions = [...tx.db.WaterProfileIon.byWaterProfileEntityId.filter(entityId)];
+  const ions = [...tx.db.WaterProfileIonTarget.byWaterProfileAssetId.filter(assetId)];
   return {
     id: entity.id,
     name: entity.name,
@@ -224,13 +219,13 @@ function loadWaterProfile(tx: any, entityId: string | undefined) {
 }
 
 function loadSchedule(tx: any, processEntityId: string) {
-  const tasks = [...tx.db.TaskSpec.byProcessEntityId.filter(processEntityId)]
+  const tasks = [...tx.db.ProcessTask.byProcessAssetId.filter(processEntityId)]
     .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
   if (tasks.length === 0) return null;
 
   // Determine workflow kind from the process
-  const process = tx.db.Process.entityId.find(processEntityId);
+  const process = tx.db.Process.assetId.find(processEntityId);
   const workflowKind = process?.processKind?.tag ?? 'koji';
 
   // Group by sectionKey to reconstruct ScheduleTemplate steps
@@ -265,7 +260,7 @@ function loadSchedule(tx: any, processEntityId: string) {
   }
 
   // Look up the process entity for the name
-  const entity = tx.db.Entity.id.find(processEntityId);
+  const entity = tx.db.Asset.id.find(processEntityId);
   return {
     name: entity?.name ? `${entity.name} Schedule` : 'Schedule',
     workflow: { kind: workflowKind },
@@ -300,7 +295,7 @@ function buildBundle(tx: any, entity: any, recipePayload: any) {
 
   let kojiData: any, motoData: any, moromiData: any;
   for (const pu of processUses) {
-    const { entity: procEntity, process } = loadProcessEntity(tx, pu.processSnapshotEntityId);
+    const { entity: procEntity, process } = loadProcessEntity(tx, pu.processSnapshotAssetId);
     switch (process.processKind.tag) {
       case 'koji': kojiData = { pu, entity: procEntity }; break;
       case 'moto': motoData = { pu, entity: procEntity }; break;
@@ -317,7 +312,7 @@ function buildBundle(tx: any, entity: any, recipePayload: any) {
   const koji = projectKojiPresetFromProcess(kojiData.entity, kojiParamMap);
   const moto = projectMotoPresetFromProcess(motoData.entity, motoParamMap);
   const moromi = projectMoromiPresetFromProcess(moromiData.entity, moromiStages, moromiSlots);
-  const waterProfile = loadWaterProfile(tx, recipePayload.defaultWaterProfileEntityId);
+  const waterProfile = loadWaterProfile(tx, recipePayload.defaultWaterProfileAssetId);
   const salts = loadAllSalts(tx);
   const acid = loadAcid(tx);
   const amendments = projectRecipeAmendmentsCompat(tx, processUses);
@@ -325,10 +320,10 @@ function buildBundle(tx: any, entity: any, recipePayload: any) {
   const template = {
     id: entity.id,
     name: entity.name,
-    kojiPresetRef: kojiData.pu.processSnapshotEntityId,
-    motoPresetRef: motoData.pu.processSnapshotEntityId,
-    moromiPresetRef: moromiData.pu.processSnapshotEntityId,
-    waterProfileRef: recipePayload.defaultWaterProfileEntityId ?? '',
+    kojiPresetRef: kojiData.pu.processSnapshotAssetId,
+    motoPresetRef: motoData.pu.processSnapshotAssetId,
+    moromiPresetRef: moromiData.pu.processSnapshotAssetId,
+    waterProfileRef: recipePayload.defaultWaterProfileAssetId ?? '',
     amendments,
   };
 
@@ -342,9 +337,9 @@ function buildBundle(tx: any, entity: any, recipePayload: any) {
   };
 
   const schedules: Record<string, any> = {};
-  const kojiSch = loadSchedule(tx, kojiData.pu.processSnapshotEntityId);
-  const motoSch = loadSchedule(tx, motoData.pu.processSnapshotEntityId);
-  const moromiSch = loadSchedule(tx, moromiData.pu.processSnapshotEntityId);
+  const kojiSch = loadSchedule(tx, kojiData.pu.processSnapshotAssetId);
+  const motoSch = loadSchedule(tx, motoData.pu.processSnapshotAssetId);
+  const moromiSch = loadSchedule(tx, moromiData.pu.processSnapshotAssetId);
   if (kojiSch) schedules.koji = kojiSch;
   if (motoSch) schedules.moto = motoSch;
   if (moromiSch) schedules.moromi = moromiSch;
@@ -368,9 +363,9 @@ function buildBundle(tx: any, entity: any, recipePayload: any) {
 export const getPublicLibraryEntries = spacetimedb.procedure(
   t.string(),
   (ctx) => ctx.withTx(tx => {
-    const all = [...tx.db.Entity.iter()];
+    const all = [...tx.db.Asset.iter()];
     const publicSnapshots = all.filter(
-      (e: any) => e.isPublic && e.entityKind.tag === 'snapshot' && e.dataType.tag === 'recipe'
+      (e: any) => e.isPublic && e.assetKind.tag === 'snapshot' && e.dataType.tag === 'recipe'
     );
 
     // Group by lineageRootId, keep first per root
@@ -395,13 +390,13 @@ export const getRecipeBundle = spacetimedb.procedure(
   { snapshotId: t.string() },
   t.string(),
   (ctx, { snapshotId }) => ctx.withTx(tx => {
-    const entity = tx.db.Entity.id.find(snapshotId);
+    const entity = tx.db.Asset.id.find(snapshotId);
     if (!entity) throw new Error(`Entity ${snapshotId} not found`);
     if (!entity.isPublic) throw new Error('Cannot view a non-public snapshot');
-    if (entity.entityKind.tag !== 'snapshot') throw new Error('Not a snapshot');
+    if (entity.assetKind.tag !== 'snapshot') throw new Error('Not a snapshot');
     if (entity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
 
-    const payload = tx.db.Recipe.entityId.find(snapshotId);
+    const payload = tx.db.Recipe.assetId.find(snapshotId);
     if (!payload) throw new Error(`Recipe payload ${snapshotId} not found`);
 
     return JSON.stringify(buildBundle(tx, entity, payload));
@@ -412,13 +407,13 @@ export const getMyRecipes = spacetimedb.procedure(
   t.string(),
   (ctx) => ctx.withTx(tx => {
     const senderId = ctx.sender.toHexString();
-    const all = [...tx.db.Entity.byOwnerId.filter(senderId)];
+    const all = [...tx.db.Asset.byOwnerId.filter(senderId)];
     const recipes = all.filter(
-      (e: any) => e.entityKind.tag === 'working' && e.dataType.tag === 'recipe'
+      (e: any) => e.assetKind.tag === 'working' && e.dataType.tag === 'recipe'
     );
     // Filter out recipes attached to a batch
     const unattached = recipes.filter((r: any) => {
-      const payload = tx.db.Recipe.entityId.find(r.id);
+      const payload = tx.db.Recipe.assetId.find(r.id);
       return !payload?.attachedBatchId;
     });
     return JSON.stringify(unattached.map((r: any) => ({
@@ -436,12 +431,12 @@ export const getMyRecipeBundle = spacetimedb.procedure(
   t.string(),
   (ctx, { recipeId }) => ctx.withTx(tx => {
     const senderId = ctx.sender.toHexString();
-    const entity = tx.db.Entity.id.find(recipeId);
+    const entity = tx.db.Asset.id.find(recipeId);
     if (!entity) throw new Error(`Recipe ${recipeId} not found`);
     if (entity.ownerId !== senderId) throw new Error('Not the owner');
     if (entity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
 
-    const payload = tx.db.Recipe.entityId.find(recipeId);
+    const payload = tx.db.Recipe.assetId.find(recipeId);
     if (!payload) throw new Error(`Recipe payload ${recipeId} not found`);
 
     return JSON.stringify(buildBundle(tx, entity, payload));
@@ -534,11 +529,11 @@ export const getMyBatches = spacetimedb.procedure(
     const senderId = ctx.sender.toHexString();
     const batches = [...tx.db.Batch.byOwnerId.filter(senderId)];
     return JSON.stringify(batches.map((b: any) => {
-      const entity = tx.db.Entity.id.find(b.batchRecipeEntityId);
+      const entity = tx.db.Asset.id.find(b.batchRecipeAssetId);
       return {
         id: b.id,
-        sourceRecipeEntityId: b.sourceRecipeEntityId,
-        batchRecipeEntityId: b.batchRecipeEntityId,
+        sourceRecipeAssetId: b.sourceRecipeAssetId,
+        batchRecipeAssetId: b.batchRecipeAssetId,
         recipeName: entity?.name ?? 'Unknown',
         status: b.status.tag,
         targetKind: b.targetKind.tag,
@@ -562,16 +557,16 @@ export const getBatchDetail = spacetimedb.procedure(
     if (batch.ownerId !== senderId) throw new Error('Not the owner');
 
     // Load processes sorted by ordinal
-    const processes = [...tx.db.BatchProcessInstance.byBatchId.filter(batchId)]
+    const processes = [...tx.db.BatchProcess.byBatchId.filter(batchId)]
       .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
     const processResults = processes.map((bpi: any) => {
       // Stages
-      const stages = [...tx.db.BatchStageInstance.byBatchProcessInstanceId.filter(bpi.id)]
+      const stages = [...tx.db.BatchStage.byBatchProcessId.filter(bpi.id)]
         .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
       const stageResults = stages.map((bsi: any) => {
-        const steps = [...tx.db.BatchStepInstance.byBatchStageInstanceId.filter(bsi.id)]
+        const steps = [...tx.db.BatchStep.byBatchStageId.filter(bsi.id)]
           .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
         return {
@@ -597,7 +592,7 @@ export const getBatchDetail = spacetimedb.procedure(
       });
 
       // Tasks grouped by section
-      const tasks = [...tx.db.BatchTaskInstance.byBatchProcessInstanceId.filter(bpi.id)]
+      const tasks = [...tx.db.BatchTask.byBatchProcessId.filter(bpi.id)]
         .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
       const sectionMap = new Map<string | null, { sectionKey: string | null; sectionLabel: string | null; tasks: any[] }>();
@@ -636,10 +631,10 @@ export const getBatchDetail = spacetimedb.procedure(
     });
 
     // Materials
-    const materials = [...tx.db.BatchMaterialPlan.byBatchId.filter(batchId)].map((m: any) => ({
+    const materials = [...tx.db.BatchMaterial.byBatchId.filter(batchId)].map((m: any) => ({
       id: m.id,
-      batchProcessInstanceId: m.batchProcessInstanceId,
-      batchStageInstanceId: m.batchStageInstanceId,
+      batchProcessId: m.batchProcessId,
+      batchStageId: m.batchStageId,
       label: m.label,
       materialClass: m.materialClass.tag,
       plannedQuantity: m.plannedQuantity,
@@ -650,7 +645,7 @@ export const getBatchDetail = spacetimedb.procedure(
       notes: m.notes,
     }));
 
-    const entity = tx.db.Entity.id.find(batch.batchRecipeEntityId);
+    const entity = tx.db.Asset.id.find(batch.batchRecipeAssetId);
     return JSON.stringify({
       batch: {
         id: batch.id,
@@ -662,8 +657,8 @@ export const getBatchDetail = spacetimedb.procedure(
         startedAt: batch.startedAt ? tsToIso(batch.startedAt) : undefined,
         completedAt: batch.completedAt ? tsToIso(batch.completedAt) : undefined,
         notes: batch.notes,
-        sourceRecipeEntityId: batch.sourceRecipeEntityId,
-        batchRecipeEntityId: batch.batchRecipeEntityId,
+        sourceRecipeAssetId: batch.sourceRecipeAssetId,
+        batchRecipeAssetId: batch.batchRecipeAssetId,
         recipeName: entity?.name ?? 'Unknown',
       },
       processes: processResults,
@@ -677,46 +672,46 @@ export const getBatchDetail = spacetimedb.procedure(
 // ── Shared recipe copy helper ────────────────────────────────────────────────
 
 function copyRecipeEntity(tx: any, sourceEntityId: string, senderId: string, overrides: {
-  entityKind: 'working' | 'snapshot';
+  assetKind: 'working' | 'snapshot';
   attachedBatchId?: string;
   version?: string;
   lineageRootId?: string;
   provenanceKind?: string;
-  provenanceEntityId?: string;
+  provenanceAssetId?: string;
 }): { newEntityId: string; rpuIdMap: Map<string, string>; rmsIdMap: Map<string, string> } {
-  const sourceEntity = tx.db.Entity.id.find(sourceEntityId);
+  const sourceEntity = tx.db.Asset.id.find(sourceEntityId);
   if (!sourceEntity) throw new Error(`Entity ${sourceEntityId} not found`);
-  const sourcePayload = tx.db.Recipe.entityId.find(sourceEntityId);
+  const sourcePayload = tx.db.Recipe.assetId.find(sourceEntityId);
   if (!sourcePayload) throw new Error(`Recipe payload ${sourceEntityId} not found`);
 
   const newEntityId = tx.newUuidV4().toString();
   const now = tx.timestamp;
 
   // Copy Entity
-  tx.db.Entity.insert({
+  tx.db.Asset.insert({
     id: newEntityId,
     ownerId: senderId,
     dataType: { tag: 'recipe' },
-    entityKind: { tag: overrides.entityKind },
+    assetKind: { tag: overrides.assetKind },
     name: sourceEntity.name,
     description: sourceEntity.description,
     version: overrides.version,
     isPublic: false,
     isArchived: false,
     lineageRootId: overrides.lineageRootId ?? newEntityId,
-    parentEntityId: sourceEntityId,
+    parentAssetId: sourceEntityId,
     provenanceKind: overrides.provenanceKind
       ? { tag: overrides.provenanceKind }
       : sourceEntity.provenanceKind,
-    provenanceEntityId: overrides.provenanceEntityId ?? sourceEntity.provenanceEntityId,
+    provenanceAssetId: overrides.provenanceAssetId ?? sourceEntity.provenanceAssetId,
     createdAt: now,
     updatedAt: now,
   });
 
   // Copy Recipe payload
   tx.db.Recipe.insert({
-    entityId: newEntityId,
-    defaultWaterProfileEntityId: sourcePayload.defaultWaterProfileEntityId,
+    assetId: newEntityId,
+    defaultWaterProfileAssetId: sourcePayload.defaultWaterProfileAssetId,
     attachedBatchId: overrides.attachedBatchId,
     notes: sourcePayload.notes,
   });
@@ -727,12 +722,12 @@ function copyRecipeEntity(tx: any, sourceEntityId: string, senderId: string, ove
   for (const rpu of sourceRpus) {
     const newRpuId = tx.newUuidV4().toString();
     rpuIdMap.set(rpu.id, newRpuId);
-    tx.db.RecipeProcessUse.insert({
+    tx.db.RecipeProcess.insert({
       id: newRpuId,
       recipeEntityId: newEntityId,
       ordinal: rpu.ordinal,
       label: rpu.label,
-      processSnapshotEntityId: rpu.processSnapshotEntityId,
+      processSnapshotAssetId: rpu.processSnapshotAssetId,
       notes: rpu.notes,
     });
   }
@@ -743,7 +738,7 @@ function copyRecipeEntity(tx: any, sourceEntityId: string, senderId: string, ove
   for (const rms of sourceRms) {
     const newRmsId = tx.newUuidV4().toString();
     rmsIdMap.set(rms.id, newRmsId);
-    tx.db.RecipeMaterialSpec.insert({
+    tx.db.RecipeMaterial.insert({
       id: newRmsId,
       recipeEntityId: newEntityId,
       key: rms.key,
@@ -761,11 +756,11 @@ function copyRecipeEntity(tx: any, sourceEntityId: string, senderId: string, ove
   for (const [oldRpuId, newRpuId] of rpuIdMap) {
     const bindings = loadRecipeMaterialBindings(tx, oldRpuId);
     for (const b of bindings) {
-      tx.db.RecipeProcessMaterialBinding.insert({
+      tx.db.RecipeMaterialBinding.insert({
         id: tx.newUuidV4().toString(),
-        recipeProcessUseId: newRpuId,
-        processMaterialSlotSpecId: b.processMaterialSlotSpecId,
-        recipeMaterialSpecId: rmsIdMap.get(b.recipeMaterialSpecId) ?? b.recipeMaterialSpecId,
+        recipeProcessId: newRpuId,
+        processMaterialSlotId: b.processMaterialSlotId,
+        recipeMaterialId: rmsIdMap.get(b.recipeMaterialId) ?? b.recipeMaterialId,
         quantityOverride: b.quantityOverride,
         quantityUnitOverride: b.quantityUnitOverride,
         notes: b.notes,
@@ -780,17 +775,17 @@ export const copyRecipeSnapshotToRecipe = spacetimedb.procedure(
   { snapshotId: t.string() },
   t.string(),
   (ctx, { snapshotId }) => ctx.withTx(tx => {
-    const sourceEntity = tx.db.Entity.id.find(snapshotId);
+    const sourceEntity = tx.db.Asset.id.find(snapshotId);
     if (!sourceEntity) throw new Error(`Snapshot ${snapshotId} not found`);
     if (!sourceEntity.isPublic) throw new Error('Cannot copy a non-public snapshot');
-    if (sourceEntity.entityKind.tag !== 'snapshot') throw new Error('Not a snapshot');
+    if (sourceEntity.assetKind.tag !== 'snapshot') throw new Error('Not a snapshot');
     if (sourceEntity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
 
     const senderId = tx.sender.toHexString();
     const { newEntityId } = copyRecipeEntity(tx, snapshotId, senderId, {
-      entityKind: 'working',
+      assetKind: 'working',
       provenanceKind: 'copied_from_public',
-      provenanceEntityId: snapshotId,
+      provenanceAssetId: snapshotId,
     });
 
     return JSON.stringify({ recipeId: newEntityId });
@@ -802,11 +797,11 @@ export const createBatch = spacetimedb.procedure(
   t.string(),
   (ctx, { recipeId, selections: selectionsJson }) => ctx.withTx(tx => {
     const senderId = tx.sender.toHexString();
-    const recipeEntity = tx.db.Entity.id.find(recipeId);
+    const recipeEntity = tx.db.Asset.id.find(recipeId);
     if (!recipeEntity) throw new Error(`Recipe ${recipeId} not found`);
     if (recipeEntity.ownerId !== senderId) throw new Error('Not the owner');
     if (recipeEntity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
-    if (recipeEntity.entityKind.tag !== 'working') throw new Error('Source must be a working recipe');
+    if (recipeEntity.assetKind.tag !== 'working') throw new Error('Source must be a working recipe');
 
     // Parse selections
     const sel = JSON.parse(selectionsJson);
@@ -817,8 +812,8 @@ export const createBatch = spacetimedb.procedure(
     const batchId = tx.newUuidV4().toString();
 
     // Create batch-private working copy of the recipe
-    const { newEntityId: batchRecipeEntityId, rpuIdMap } = copyRecipeEntity(tx, recipeId, senderId, {
-      entityKind: 'working',
+    const { newEntityId: batchRecipeAssetId, rpuIdMap } = copyRecipeEntity(tx, recipeId, senderId, {
+      assetKind: 'working',
       attachedBatchId: batchId,
       lineageRootId: recipeEntity.lineageRootId,
     });
@@ -827,8 +822,8 @@ export const createBatch = spacetimedb.procedure(
     tx.db.Batch.insert({
       id: batchId,
       ownerId: senderId,
-      sourceRecipeEntityId: recipeId,
-      batchRecipeEntityId,
+      sourceRecipeAssetId: recipeId,
+      batchRecipeAssetId,
       name: recipeEntity.name,
       status: { tag: 'planned' },
       targetKind: { tag: targetKind },
@@ -843,7 +838,7 @@ export const createBatch = spacetimedb.procedure(
     // ── Instantiate execution rows ─────────────────────────────────────────
 
     // Build a map of new RPU ids to their rows for the copied recipe
-    const newRpus = loadRecipeProcessUses(tx, batchRecipeEntityId);
+    const newRpus = loadRecipeProcessUses(tx, batchRecipeAssetId);
 
     // Map from new RPU id back to the original RPU id (for selection matching)
     const reverseRpuMap = new Map<string, string>();
@@ -857,16 +852,16 @@ export const createBatch = spacetimedb.procedure(
     const processInstanceByKind = new Map<string, string>();
 
     for (const rpu of newRpus) {
-      const { process } = loadProcessEntity(tx, rpu.processSnapshotEntityId);
+      const { process } = loadProcessEntity(tx, rpu.processSnapshotAssetId);
       const processKind = process.processKind.tag;
       const bpiId = tx.newUuidV4().toString();
 
-      tx.db.BatchProcessInstance.insert({
+      tx.db.BatchProcess.insert({
         id: bpiId,
         batchId,
-        recipeProcessUseId: rpu.id,
+        recipeProcessId: rpu.id,
         ordinal: rpu.ordinal,
-        processSnapshotEntityId: rpu.processSnapshotEntityId,
+        processSnapshotAssetId: rpu.processSnapshotAssetId,
         label: rpu.label,
         status: { tag: 'pending' },
         startedAt: undefined,
@@ -876,7 +871,7 @@ export const createBatch = spacetimedb.procedure(
       processInstanceByKind.set(processKind, bpiId);
 
       // Stages
-      const stages = loadProcessStages(tx, rpu.processSnapshotEntityId);
+      const stages = loadProcessStages(tx, rpu.processSnapshotAssetId);
       const kindStageMap = stageInstancesByProcessKind.get(processKind) ?? new Map<number, string>();
       const stageSpecToInstanceId = new Map<string, string>();
       const stepSpecToInstanceId = new Map<string, string>();
@@ -884,10 +879,10 @@ export const createBatch = spacetimedb.procedure(
       for (const stage of stages) {
         const bsiId = tx.newUuidV4().toString();
 
-        tx.db.BatchStageInstance.insert({
+        tx.db.BatchStage.insert({
           id: bsiId,
-          batchProcessInstanceId: bpiId,
-          stageSpecId: stage.id,
+          batchProcessId: bpiId,
+          stageId: stage.id,
           ordinal: stage.ordinal,
           label: stage.label,
           status: { tag: 'pending' },
@@ -906,10 +901,10 @@ export const createBatch = spacetimedb.procedure(
         for (const step of steps) {
           const bstepId = tx.newUuidV4().toString();
 
-          tx.db.BatchStepInstance.insert({
+          tx.db.BatchStep.insert({
             id: bstepId,
-            batchStageInstanceId: bsiId,
-            stepSpecId: step.id,
+            batchStageId: bsiId,
+            stepId: step.id,
             ordinal: step.ordinal,
             label: step.label,
             renderedInstruction: step.instructionTemplate,
@@ -922,24 +917,6 @@ export const createBatch = spacetimedb.procedure(
           });
 
           stepSpecToInstanceId.set(step.id, bstepId);
-
-          // Step fields
-          const fields = loadProcessStepFields(tx, step.id);
-          for (const field of fields) {
-            tx.db.BatchStepFieldValue.insert({
-              id: tx.newUuidV4().toString(),
-              batchStepInstanceId: bstepId,
-              stepFieldSpecId: field.id,
-              key: field.key,
-              plannedNumber: field.defaultNumberValue,
-              plannedText: field.defaultTextValue,
-              plannedBool: field.defaultBoolValue,
-              actualNumber: undefined,
-              actualText: undefined,
-              actualBool: undefined,
-              actualLoggedAt: undefined,
-            });
-          }
         }
       }
 
@@ -947,37 +924,37 @@ export const createBatch = spacetimedb.procedure(
 
       // ── Task instance rows for this process ───────────────────────────
 
-      const taskSpecs = [...tx.db.TaskSpec.byProcessEntityId.filter(rpu.processSnapshotEntityId)]
+      const taskSpecs = [...tx.db.ProcessTask.byProcessAssetId.filter(rpu.processSnapshotAssetId)]
         .sort((a: any, b: any) => a.ordinal - b.ordinal);
 
       for (const spec of taskSpecs) {
-        const bsiId = spec.stageSpecId ? stageSpecToInstanceId.get(spec.stageSpecId) : undefined;
-        const bstepId = spec.stepSpecId ? stepSpecToInstanceId.get(spec.stepSpecId) : undefined;
+        const bsiId = spec.stageId ? stageSpecToInstanceId.get(spec.stageId) : undefined;
+        const bstepId = spec.stepId ? stepSpecToInstanceId.get(spec.stepId) : undefined;
 
         // Compute dueAt (will be undefined for new batches since nothing has startedAt yet)
         let dueAt: any = undefined;
         if (spec.timingKind.tag === 'absolute' && spec.hoursFromStart != null) {
-          const bpi = tx.db.BatchProcessInstance.id.find(bpiId);
+          const bpi = tx.db.BatchProcess.id.find(bpiId);
           if (bpi?.startedAt) {
             dueAt = addHours(bpi.startedAt, spec.hoursFromStart);
           }
-        } else if (spec.timingKind.tag === 'relative_to_stage' && spec.anchorStageSpecId && spec.offsetHours != null) {
-          const anchorBsiId = stageSpecToInstanceId.get(spec.anchorStageSpecId);
+        } else if (spec.timingKind.tag === 'relative_to_stage' && spec.anchorStageId && spec.offsetHours != null) {
+          const anchorBsiId = stageSpecToInstanceId.get(spec.anchorStageId);
           if (anchorBsiId) {
-            const anchorBsi = tx.db.BatchStageInstance.id.find(anchorBsiId);
+            const anchorBsi = tx.db.BatchStage.id.find(anchorBsiId);
             if (anchorBsi?.startedAt) {
               dueAt = addHours(anchorBsi.startedAt, spec.offsetHours);
             }
           }
         }
 
-        tx.db.BatchTaskInstance.insert({
+        tx.db.BatchTask.insert({
           id: tx.newUuidV4().toString(),
           batchId,
-          batchProcessInstanceId: bpiId,
-          batchStageInstanceId: bsiId,
-          batchStepInstanceId: bstepId,
-          taskSpecId: spec.id,
+          batchProcessId: bpiId,
+          batchStageId: bsiId,
+          batchStepId: bstepId,
+          processTaskId: spec.id,
           ordinal: spec.ordinal,
           key: spec.key,
           label: spec.label,
@@ -995,26 +972,26 @@ export const createBatch = spacetimedb.procedure(
 
       const bindings = loadRecipeMaterialBindings(tx, rpu.id);
       for (const binding of bindings) {
-        const slotSpec = tx.db.ProcessMaterialSlotSpec.id.find(binding.processMaterialSlotSpecId);
-        const materialSpec = tx.db.RecipeMaterialSpec.id.find(binding.recipeMaterialSpecId);
+        const slotSpec = tx.db.ProcessMaterialSlot.id.find(binding.processMaterialSlotId);
+        const materialSpec = tx.db.RecipeMaterial.id.find(binding.recipeMaterialId);
         if (!slotSpec || !materialSpec) continue;
 
         // Find the stage instance for this slot's stage
-        let batchStageInstanceId: string | undefined;
-        if (slotSpec.stageSpecId) {
-          const stageSpec = tx.db.ProcessStageSpec.id.find(slotSpec.stageSpecId);
+        let batchStageId: string | undefined;
+        if (slotSpec.stageId) {
+          const stageSpec = tx.db.ProcessStage.id.find(slotSpec.stageId);
           if (stageSpec?.materialOrdinal != null) {
-            batchStageInstanceId = kindStageMap.get(stageSpec.materialOrdinal);
+            batchStageId = kindStageMap.get(stageSpec.materialOrdinal);
           }
         }
 
-        tx.db.BatchMaterialPlan.insert({
+        tx.db.BatchMaterial.insert({
           id: tx.newUuidV4().toString(),
           batchId,
-          batchProcessInstanceId: bpiId,
-          batchStageInstanceId,
-          processMaterialSlotSpecId: slotSpec.id,
-          recipeMaterialSpecId: materialSpec.id,
+          batchProcessId: bpiId,
+          batchStageId,
+          processMaterialSlotId: slotSpec.id,
+          recipeMaterialId: materialSpec.id,
           label: materialSpec.label,
           materialClass: materialSpec.materialClass,
           plannedQuantity: binding.quantityOverride ?? slotSpec.quantityValue,
@@ -1029,7 +1006,7 @@ export const createBatch = spacetimedb.procedure(
 
     // ── Map selections to inventory refs ──────────────────────────────────
 
-    const materialPlans = [...tx.db.BatchMaterialPlan.byBatchId.filter(batchId)];
+    const materialPlans = [...tx.db.BatchMaterial.byBatchId.filter(batchId)];
 
     function assignInventoryRef(
       materialClass: string,
@@ -1041,25 +1018,25 @@ export const createBatch = spacetimedb.procedure(
       for (const plan of materialPlans) {
         if (plan.materialClass.tag !== materialClass) continue;
         // Match by process kind
-        const bpi = plan.batchProcessInstanceId
-          ? tx.db.BatchProcessInstance.id.find(plan.batchProcessInstanceId)
+        const bpi = plan.batchProcessId
+          ? tx.db.BatchProcess.id.find(plan.batchProcessId)
           : null;
         if (!bpi) continue;
-        const { process } = loadProcessEntity(tx, bpi.processSnapshotEntityId);
+        const { process } = loadProcessEntity(tx, bpi.processSnapshotAssetId);
         if (process.processKind.tag !== processKind) continue;
 
         // If materialOrdinal specified, match by stage materialOrdinal
         if (materialOrdinal != null) {
-          if (!plan.batchStageInstanceId) continue;
-          const bsi = tx.db.BatchStageInstance.id.find(plan.batchStageInstanceId);
+          if (!plan.batchStageId) continue;
+          const bsi = tx.db.BatchStage.id.find(plan.batchStageId);
           if (!bsi) continue;
-          const stageSpec = tx.db.ProcessStageSpec.id.find(bsi.stageSpecId);
+          const stageSpec = tx.db.ProcessStage.id.find(bsi.stageId);
           if (!stageSpec || stageSpec.materialOrdinal !== materialOrdinal) continue;
         }
 
         // Update the plan row
-        tx.db.BatchMaterialPlan.id.delete(plan.id);
-        tx.db.BatchMaterialPlan.insert({
+        tx.db.BatchMaterial.id.delete(plan.id);
+        tx.db.BatchMaterial.insert({
           ...plan,
           inventoryRefType,
           inventoryRefId,
@@ -1088,7 +1065,7 @@ export const createBatch = spacetimedb.procedure(
       }
     }
 
-    return JSON.stringify({ batchId, batchRecipeEntityId });
+    return JSON.stringify({ batchId, batchRecipeAssetId });
   })
 );
 
@@ -1097,30 +1074,30 @@ export const createBatch = spacetimedb.procedure(
 export const deleteRecipe = spacetimedb.reducer(
   { recipeId: t.string() },
   (ctx, { recipeId }) => {
-    const entity = ctx.db.Entity.id.find(recipeId);
+    const entity = ctx.db.Asset.id.find(recipeId);
     if (!entity) throw new Error(`Recipe ${recipeId} not found`);
     if (entity.ownerId !== ctx.sender.toHexString()) throw new Error('Not the owner');
     if (entity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
 
     // Delete bindings for each RPU
-    const rpus = [...ctx.db.RecipeProcessUse.byRecipeEntityId.filter(recipeId)];
+    const rpus = [...ctx.db.RecipeProcess.byRecipeAssetId.filter(recipeId)];
     for (const rpu of rpus) {
-      const bindings = [...ctx.db.RecipeProcessMaterialBinding.byRecipeProcessUseId.filter(rpu.id)];
+      const bindings = [...ctx.db.RecipeMaterialBinding.byRecipeProcessId.filter(rpu.id)];
       for (const b of bindings) {
-        ctx.db.RecipeProcessMaterialBinding.id.delete(b.id);
+        ctx.db.RecipeMaterialBinding.id.delete(b.id);
       }
-      ctx.db.RecipeProcessUse.id.delete(rpu.id);
+      ctx.db.RecipeProcess.id.delete(rpu.id);
     }
 
     // Delete material specs
-    const specs = [...ctx.db.RecipeMaterialSpec.byRecipeEntityId.filter(recipeId)];
+    const specs = [...ctx.db.RecipeMaterial.byRecipeAssetId.filter(recipeId)];
     for (const s of specs) {
-      ctx.db.RecipeMaterialSpec.id.delete(s.id);
+      ctx.db.RecipeMaterial.id.delete(s.id);
     }
 
     // Delete payload and entity
-    ctx.db.Recipe.entityId.delete(recipeId);
-    ctx.db.Entity.id.delete(recipeId);
+    ctx.db.Recipe.assetId.delete(recipeId);
+    ctx.db.Asset.id.delete(recipeId);
   }
 );
 
