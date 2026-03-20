@@ -3,9 +3,12 @@ import type { RecipePlanDraft } from '$lib/engine/models/planTypes';
 
 export type BatchListItem = {
 	id: string;
-	recipeSnapshotId: string;
+	sourceRecipeAssetId: string;
+	batchRecipeAssetId: string;
 	recipeName: string;
 	status: string;
+	targetKind: string;
+	targetValue: number;
 	createdAt?: string;
 	startedAt?: string;
 	completedAt?: string;
@@ -35,7 +38,7 @@ export async function createBatch(
 	recipeId: string,
 	draft: RecipePlanDraft,
 	version?: string
-): Promise<{ batchId: string; snapshotId: string }> {
+): Promise<{ batchId: string; batchRecipeEntityId: string }> {
 	await connect();
 	const json = await procedures().createBatch({
 		recipeId,

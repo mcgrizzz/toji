@@ -12,3 +12,9 @@ export async function getMyInventory(): Promise<Inventory> {
 	const json = await procedures().getMyInventory({} as never);
 	return JSON.parse(json);
 }
+
+export async function getSeedInventory(): Promise<Inventory> {
+	await connect();
+	const json = await procedures().getSeedInventory({} as never);
+	return JSON.parse(json);
+}

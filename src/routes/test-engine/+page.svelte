@@ -2,6 +2,7 @@
 	import { recipeInput } from '$lib/engine/fixtures/testInput';
 	import { resolveRecipe } from '$lib/engine/core/resolveRecipe';
 	import type { EngineInput, EngineOutput } from '$lib/engine/core/engineTypes';
+	import DebugNav from '../DebugNav.svelte';
 
 	let draft = $state(JSON.stringify(recipeInput, null, 2));
 
@@ -24,6 +25,8 @@
 		return resolveRecipe(parsed.value);
 	});
 </script>
+
+<DebugNav current="engine" />
 
 <div class="mx-auto max-w-6xl p-4">
   <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
