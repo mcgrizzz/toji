@@ -254,6 +254,51 @@ export const ProcessStep = table(
   }
 );
 
+// ── Metric tables ────────────────────────────────────────────────────────────
+
+export const ProcessMetric = table(
+  {
+    name: 'process_metric',
+    public: true,
+    indexes: [
+      { accessor: 'byProcessAssetId', algorithm: 'btree' as const, columns: ['processAssetId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    processAssetId: t.string(),
+    ordinal: t.i32(),
+    key: t.string(),
+    label: t.string(),
+    valueType: ValueType,
+    unit: t.option(t.string()),
+    isTimeSeries: t.bool(),
+    notes: t.option(t.string()),
+  }
+);
+
+export const StageMetric = table(
+  {
+    name: 'stage_metric',
+    public: true,
+    indexes: [
+      { accessor: 'byStageId', algorithm: 'btree' as const, columns: ['stageId'] },
+      { accessor: 'byProcessMetricId', algorithm: 'btree' as const, columns: ['processMetricId'] },
+    ],
+  },
+  {
+    id: t.string().primaryKey(),
+    stageId: t.string(),
+    processMetricId: t.string(),
+    ordinal: t.i32(),
+    trackByDefault: t.bool(),
+    targetMinNumber: t.option(t.f64()),
+    targetMaxNumber: t.option(t.f64()),
+    targetText: t.option(t.string()),
+    notes: t.option(t.string()),
+  }
+);
+
 // ── Task tables ──────────────────────────────────────────────────────────────
 
 export const ProcessTask = table(

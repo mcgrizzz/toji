@@ -89,6 +89,21 @@ export function seedLibrary(ctx: any): void {
     ctx.db.ProcessStep.insert({ id: kojiStepIds.peak_hold, stageId: kojiStageId, ordinal: 9, key: 'peak_hold', label: 'Peak Temperature Hold', instructionTemplate: 'Hold near peak temperature and monitor for stability.', sectionKey: 'peak', sectionLabel: 'Peak Temperature', notes: 'Smaller batches may fluctuate more at peak temperature.' });
     ctx.db.ProcessStep.insert({ id: kojiStepIds.dekoji_finish, stageId: kojiStageId, ordinal: 10, key: 'dekoji_finish', label: 'De-koji', instructionTemplate: 'Remove koji from chamber, record final weight, and cool gradually.', sectionKey: 'dekoji', sectionLabel: 'De-koji', notes: 'De-koji usually 10-18h after peak; often 48-50h from inoculation. Final weight ratio around 12-17% is acceptable, even 10-20%.' });
 
+    // Koji metrics
+    const pmKojiTemp = 'pm-koji-ueda-koji_temp_c';
+    const pmChamberTemp = 'pm-koji-ueda-chamber_temp_c';
+    const pmWeightRatio = 'pm-koji-ueda-weight_ratio_pct';
+    const pmNetWeight = 'pm-koji-ueda-net_weight_g';
+    ctx.db.ProcessMetric.insert({ id: pmKojiTemp, processAssetId: kojiEntityId, ordinal: 1, key: 'koji_temp_c', label: 'Koji Temperature', valueType: { tag: 'number' }, unit: '°C', isTimeSeries: true, notes: undefined });
+    ctx.db.ProcessMetric.insert({ id: pmChamberTemp, processAssetId: kojiEntityId, ordinal: 2, key: 'chamber_temp_c', label: 'Chamber Temperature', valueType: { tag: 'number' }, unit: '°C', isTimeSeries: true, notes: undefined });
+    ctx.db.ProcessMetric.insert({ id: pmWeightRatio, processAssetId: kojiEntityId, ordinal: 3, key: 'weight_ratio_pct', label: 'Weight Ratio', valueType: { tag: 'number' }, unit: '%', isTimeSeries: true, notes: undefined });
+    ctx.db.ProcessMetric.insert({ id: pmNetWeight, processAssetId: kojiEntityId, ordinal: 4, key: 'net_weight_g', label: 'Net Weight', valueType: { tag: 'number' }, unit: 'g', isTimeSeries: true, notes: undefined });
+
+    // Koji stage metrics (skeletal — a few examples with target ranges)
+    ctx.db.StageMetric.insert({ id: 'sm-koji-ueda-making-koji_temp', stageId: kojiStageId, processMetricId: pmKojiTemp, ordinal: 1, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
+    ctx.db.StageMetric.insert({ id: 'sm-koji-ueda-making-chamber_temp', stageId: kojiStageId, processMetricId: pmChamberTemp, ordinal: 2, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
+    ctx.db.StageMetric.insert({ id: 'sm-koji-ueda-making-weight_ratio', stageId: kojiStageId, processMetricId: pmWeightRatio, ordinal: 3, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
+
     // Koji schedule (TaskSpec rows) — with explicit sectionKey/sectionLabel
     const kojiSteps: SeedStep[] = [
       { label: 'Soak + Drain Rest', sectionKey: 'soaking', sectionLabel: 'Soaking', atH: 0, durationH: 4, goals: ['Target 29–32% weight gain by end of soak/drain period'], checks: [], actions: ['Soak rice to target absorption, drain, then rest to allow moisture to distribute evenly'] },
@@ -193,6 +208,21 @@ export function seedLibrary(ctx: any): void {
     ctx.db.ProcessMaterialSlot.insert({ id: 'pmss-moromi-tome-rice', processAssetId: moromiEntityId, stageId: tomeStageId, ordinal: 8, key: 'rice', label: 'Rice', materialClass: { tag: 'rice' }, quantityMode: { tag: 'ratio_of_total_rice' }, quantityValue: 0.48, quantityUnit: undefined, notes: undefined });
     ctx.db.ProcessMaterialSlot.insert({ id: 'pmss-moromi-tome-koji', processAssetId: moromiEntityId, stageId: tomeStageId, ordinal: 9, key: 'koji', label: 'Koji', materialClass: { tag: 'koji' }, quantityMode: { tag: 'ratio_of_stage_rice' }, quantityValue: 0.21, quantityUnit: undefined, notes: undefined });
     ctx.db.ProcessMaterialSlot.insert({ id: 'pmss-moromi-tome-water', processAssetId: moromiEntityId, stageId: tomeStageId, ordinal: 10, key: 'water', label: 'Water', materialClass: { tag: 'water' }, quantityMode: { tag: 'ratio_of_target' }, quantityValue: 1.2, quantityUnit: undefined, notes: undefined });
+
+    // Moromi metrics
+    const pmMoromiTemp = 'pm-moromi-sandan-moromi_temp_c';
+    const pmAmbientTemp = 'pm-moromi-sandan-ambient_temp_c';
+    const pmPh = 'pm-moromi-sandan-ph';
+    const pmBaume = 'pm-moromi-sandan-baume';
+    ctx.db.ProcessMetric.insert({ id: pmMoromiTemp, processAssetId: moromiEntityId, ordinal: 1, key: 'moromi_temp_c', label: 'Moromi Temperature', valueType: { tag: 'number' }, unit: '°C', isTimeSeries: true, notes: undefined });
+    ctx.db.ProcessMetric.insert({ id: pmAmbientTemp, processAssetId: moromiEntityId, ordinal: 2, key: 'ambient_temp_c', label: 'Ambient Temperature', valueType: { tag: 'number' }, unit: '°C', isTimeSeries: true, notes: undefined });
+    ctx.db.ProcessMetric.insert({ id: pmPh, processAssetId: moromiEntityId, ordinal: 3, key: 'ph', label: 'pH', valueType: { tag: 'number' }, unit: undefined, isTimeSeries: true, notes: undefined });
+    ctx.db.ProcessMetric.insert({ id: pmBaume, processAssetId: moromiEntityId, ordinal: 4, key: 'baume', label: 'Baumé', valueType: { tag: 'number' }, unit: '°Bé', isTimeSeries: true, notes: undefined });
+
+    // Moromi stage metrics (skeletal — one example per addition stage)
+    ctx.db.StageMetric.insert({ id: 'sm-moromi-sandan-soe-temp', stageId: soeStageId, processMetricId: pmMoromiTemp, ordinal: 1, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
+    ctx.db.StageMetric.insert({ id: 'sm-moromi-sandan-naka-temp', stageId: nakaStageId, processMetricId: pmMoromiTemp, ordinal: 1, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
+    ctx.db.StageMetric.insert({ id: 'sm-moromi-sandan-tome-temp', stageId: tomeStageId, processMetricId: pmMoromiTemp, ordinal: 1, trackByDefault: true, targetMinNumber: undefined, targetMaxNumber: undefined, targetText: undefined, notes: undefined });
   }
 
   // ── Recipe snapshot entity ────────────────────────────────────────────────
