@@ -1,6 +1,11 @@
 import { schema } from 'spacetimedb/server';
 
 export {
+  User,
+  AuthIdentity,
+} from './user';
+
+export {
   CatalogRiceVariety,
   CatalogYeastProduct,
   CatalogKojiSporeProduct,
@@ -13,8 +18,6 @@ export {
 } from './catalog';
 
 export {
-  User,
-  AuthIdentity,
   Asset,
   Recipe,
   Process,
@@ -46,6 +49,11 @@ export {
 } from './batch';
 
 import {
+  User,
+  AuthIdentity,
+} from './user';
+
+import {
   CatalogRiceVariety,
   CatalogYeastProduct,
   CatalogKojiSporeProduct,
@@ -58,8 +66,6 @@ import {
 } from './catalog';
 
 import {
-  User,
-  AuthIdentity,
   Asset,
   Recipe,
   Process,
