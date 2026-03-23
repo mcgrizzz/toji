@@ -6,8 +6,9 @@ import { seedDemoData as seedDemoDataFn } from './seed/seedData';
 export default spacetimedb;
 
 const ALLOWED_ISSUERS = new Set([
-  'https://discord.com',
   'https://auth.spacetimedb.com',
+  'localhost', // SpacetimeDB-issued JWT for anonymous/tokenless connections
+  'https://auth.toji.app', // Better Auth (ORIGIN)
 ]);
 
 export const onConnect = spacetimedb.clientConnected(ctx => {
@@ -20,31 +21,63 @@ export const onConnect = spacetimedb.clientConnected(ctx => {
     throw new SenderError(`Unauthorized: issuer '${jwt.issuer}' is not allowed`);
   }
 
-  // Upsert User + AuthIdentity for non-admin issuers
-  if (jwt.issuer === 'https://auth.spacetimedb.com') return;
+  // Only create User + AuthIdentity for Better Auth JWTs
+  if (jwt.issuer === 'https://auth.spacetimedb.com' || jwt.issuer === 'localhost') return;
 
   const identityHex = ctx.sender.toHexString();
   const now = ctx.timestamp;
 
+  // Already seen this exact identity → done
   const existing = ctx.db.AuthIdentity.identityHex.find(identityHex);
-  if (!existing) {
-    const userId = ctx.newUuidV4().toString();
+  if (existing) return;
+
+  // Extract profile from JWT claims
+  const email = typeof jwt.fullPayload.email === 'string' ? jwt.fullPayload.email : undefined;
+  const name = typeof jwt.fullPayload.name === 'string' ? jwt.fullPayload.name : 'Brewer';
+  const avatarUrl = typeof jwt.fullPayload.image === 'string' ? jwt.fullPayload.image : undefined;
+
+  // 1. Cross-provider dedup: same email → same user
+  let userId: string | undefined;
+  if (email) {
+    for (const u of ctx.db.User.iter()) {
+      if (u.email === email) {
+        userId = u.id;
+        break;
+      }
+    }
+  }
+
+  // 2. Same-provider fallback: same subject+issuer → same user
+  if (!userId) {
+    for (const ai of ctx.db.AuthIdentity.iter()) {
+      if (ai.subject === jwt.subject && ai.issuer === jwt.issuer) {
+        userId = ai.userId;
+        break;
+      }
+    }
+  }
+
+  // 3. Brand new user
+  if (!userId) {
+    userId = ctx.newUuidV4().toString();
     ctx.db.User.insert({
       id: userId,
-      displayName: jwt.subject,
-      email: undefined,
-      avatarUrl: undefined,
+      displayName: name,
+      email,
+      avatarUrl,
       createdAt: now,
       updatedAt: now,
     });
-    ctx.db.AuthIdentity.insert({
-      identityHex,
-      userId,
-      issuer: jwt.issuer,
-      subject: jwt.subject,
-      createdAt: now,
-    });
   }
+
+  // Link this identity to the user
+  ctx.db.AuthIdentity.insert({
+    identityHex,
+    userId,
+    issuer: jwt.issuer,
+    subject: jwt.subject,
+    createdAt: now,
+  });
 });
 export const onDisconnect = spacetimedb.clientDisconnected(_ctx => {});
 
@@ -406,7 +439,7 @@ export const getRecipeBundle = spacetimedb.procedure(
 export const getMyRecipes = spacetimedb.procedure(
   t.string(),
   (ctx) => ctx.withTx(tx => {
-    const senderId = ctx.sender.toHexString();
+    const senderId = tx.sender.toHexString();
     const all = [...tx.db.Asset.byOwnerId.filter(senderId)];
     const recipes = all.filter(
       (e: any) => e.assetKind.tag === 'working' && e.dataType.tag === 'recipe'
@@ -430,7 +463,7 @@ export const getMyRecipeBundle = spacetimedb.procedure(
   { recipeId: t.string() },
   t.string(),
   (ctx, { recipeId }) => ctx.withTx(tx => {
-    const senderId = ctx.sender.toHexString();
+    const senderId = tx.sender.toHexString();
     const entity = tx.db.Asset.id.find(recipeId);
     if (!entity) throw new Error(`Recipe ${recipeId} not found`);
     if (entity.ownerId !== senderId) throw new Error('Not the owner');
@@ -446,7 +479,7 @@ export const getMyRecipeBundle = spacetimedb.procedure(
 export const getMyInventory = spacetimedb.procedure(
   t.string(),
   (ctx) => ctx.withTx(tx => {
-    const senderId = ctx.sender.toHexString();
+    const senderId = tx.sender.toHexString();
 
     const riceLots = [...tx.db.InventoryRiceLot.byOwnerId.filter(senderId)].map((r: any) => {
       let variety = r.customVarietyName;
@@ -526,7 +559,7 @@ export const getSeedInventory = spacetimedb.procedure(
 export const getMyBatches = spacetimedb.procedure(
   t.string(),
   (ctx) => ctx.withTx(tx => {
-    const senderId = ctx.sender.toHexString();
+    const senderId = tx.sender.toHexString();
     const batches = [...tx.db.Batch.byOwnerId.filter(senderId)];
     return JSON.stringify(batches.map((b: any) => {
       const entity = tx.db.Asset.id.find(b.batchRecipeAssetId);
@@ -551,7 +584,7 @@ export const getBatchDetail = spacetimedb.procedure(
   { batchId: t.string() },
   t.string(),
   (ctx, { batchId }) => ctx.withTx(tx => {
-    const senderId = ctx.sender.toHexString();
+    const senderId = tx.sender.toHexString();
     const batch = tx.db.Batch.id.find(batchId);
     if (!batch) throw new Error(`Batch ${batchId} not found`);
     if (batch.ownerId !== senderId) throw new Error('Not the owner');
@@ -1074,9 +1107,10 @@ export const createBatch = spacetimedb.procedure(
 export const deleteRecipe = spacetimedb.reducer(
   { recipeId: t.string() },
   (ctx, { recipeId }) => {
+    const senderId = ctx.sender.toHexString();
     const entity = ctx.db.Asset.id.find(recipeId);
     if (!entity) throw new Error(`Recipe ${recipeId} not found`);
-    if (entity.ownerId !== ctx.sender.toHexString()) throw new Error('Not the owner');
+    if (entity.ownerId !== senderId) throw new Error('Not the owner');
     if (entity.dataType.tag !== 'recipe') throw new Error('Not a recipe');
 
     // Delete bindings for each RPU

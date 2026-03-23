@@ -47,7 +47,9 @@
 		"vite": "^7.2.6"
 	},
 	"dependencies": {
-		"arctic": "^3.7.0",
+		"@better-auth/oauth-provider": "^1.5.5",
+		"better-auth": "^1.5.5",
+		"better-sqlite3": "^12.8.0",
 		"spacetimedb": "^2.0.4"
 	}
 }

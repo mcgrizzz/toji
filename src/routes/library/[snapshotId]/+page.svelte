@@ -104,13 +104,15 @@
 			</section>
 		{/if}
 
-		<button
-			type="button"
-			onclick={copyToMyRecipes}
-			disabled={copying}
-			class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50 disabled:pointer-events-none"
-		>
-			{copying ? 'Copying...' : 'Copy to My Recipes'}
-		</button>
+		{#if $page.data.user}
+			<button
+				type="button"
+				onclick={copyToMyRecipes}
+				disabled={copying}
+				class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50 disabled:pointer-events-none"
+			>
+				{copying ? 'Copying...' : 'Copy to My Recipes'}
+			</button>
+		{/if}
 	</main>
 {/if}
